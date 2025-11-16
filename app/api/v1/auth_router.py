@@ -21,10 +21,13 @@ def login(data: UserLogin = Depends(UserLogin.as_form), session: Session = Depen
     return authenticate_user(data.username, data.password, session)
 
 
+# app/api/v1/auth_router.py (ИСПРАВЛЕНО)
+
 @router.post("/refresh", response_model=dict)
 def refresh_token(refresh_token: str):
     """Обновление access токена"""
-    username = decode_token(refresh_token)
+    # Указываем, что ожидаем "refresh" токен
+    username = decode_token(refresh_token, expected_type="refresh")
     if not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

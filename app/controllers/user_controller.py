@@ -37,12 +37,16 @@ def authenticate_user(username: str, password: str, session: Session):
 
     access_token = create_access_token(data={"sub": user.username})
     refresh_token = create_refresh_token(data={"sub": user.username})
+    # app/controllers/user_controller.py (или где находится return)
 
     return {
-        "accessToken": access_token,
+        # ИСПРАВЛЕНИЕ: Ключ должен быть "access_token" (все маленькие буквы)
+        "access_token": access_token,
         "refreshToken": refresh_token,
         "tokenType": "bearer"
     }
+
+
 
 
 def get_all_users(session: Session) -> List[User]:

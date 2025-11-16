@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -6,9 +6,10 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.db.session import get_session
+from app.models.user import User
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 def hash_password(password: str) -> str:
@@ -24,7 +25,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta = None):
     """Создание JWT токена"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -32,15 +34,23 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 def create_refresh_token(data: dict):
     """Создание refresh токена"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=7)
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(days=7)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def decode_token(token: str):
-    """Декодирование токена"""
+
+def decode_token(token: str, expected_type: str = "access"):
+    """Декодирование токена с проверкой типа"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_type = payload.get("type")
+        if token_type != expected_type:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный тип токена"
+            )
         return payload.get("sub")
     except JWTError:
         return None
@@ -48,9 +58,8 @@ def decode_token(token: str):
 
 def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
     """Получение текущего пользователя по токену"""
-    from app.models.user import User
 
-    username = decode_token(token)
+    username = decode_token(token, expected_type="access")
     if not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -38,8 +38,11 @@ class UserResponse(BaseModel):
     role: str
 
 
+# app/schemas/user_schema.py
+
 class TokenResponse(BaseModel):
     """Схема ответа с токенами"""
-    accessToken: str
+    # ДОЛЖНО БЫТЬ access_token
+    access_token: str
     refreshToken: str
     tokenType: str = "bearer"
