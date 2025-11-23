@@ -94,3 +94,7 @@ def get_bookings_by_passenger(passport: str, session: Session) -> List[Booking]:
     return session.exec(
         select(Booking).where(Booking.passenger_id == passenger.id)
     ).all()
+
+def get_all_bookings(session: Session) -> List[Booking]:
+    """Получение всех бронирований"""
+    return session.exec(select(Booking)).all()

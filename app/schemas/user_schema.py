@@ -7,7 +7,6 @@ class UserCreate(BaseModel):
     """Схема создания пользователя"""
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8)
-    role: str = Field(default="dispatcher")
 
     @field_validator('password')
     def password_complexity(cls, v):
@@ -42,7 +41,11 @@ class UserResponse(BaseModel):
 
 class TokenResponse(BaseModel):
     """Схема ответа с токенами"""
-    # ДОЛЖНО БЫТЬ access_token
     access_token: str
     refreshToken: str
     tokenType: str = "bearer"
+
+# --- НОВАЯ СХЕМА ---
+class UserUpdateRole(BaseModel):
+    """Схема для обновления роли пользователя"""
+    role: str

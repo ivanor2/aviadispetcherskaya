@@ -73,3 +73,9 @@ def get_bookings_by_passenger_endpoint(
         )
         for b in bookings
     ]
+
+@router.get("", response_model=List[BookingResponse], dependencies=[Depends(get_current_user)])
+def get_all_bookings_endpoint(session: Session = Depends(get_session)):
+    """Получение списка всех бронирований (требуется аутентификация)"""
+    bookings = get_all_bookings(session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]

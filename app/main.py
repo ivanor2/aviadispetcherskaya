@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
 
 
 # Основное приложение
-main_app = FastAPI()
+main_app = FastAPI(lifespan=lifespan)
 
 # API v1
 app_v1 = FastAPI(

@@ -1,5 +1,6 @@
+# app/controllers/user_controller.py
 from sqlmodel import Session, select
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status # Убедитесь, что импортированы
 from app.models.user import User
 from app.schemas.user_schema import UserCreate
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
@@ -18,7 +19,7 @@ def create_user(data: UserCreate, session: Session) -> User:
     user = User(
         username=data.username,
         password=hash_password(data.password),
-        role=data.role
+        role="dispatcher"
     )
     session.add(user)
     session.commit()
@@ -37,17 +38,42 @@ def authenticate_user(username: str, password: str, session: Session):
 
     access_token = create_access_token(data={"sub": user.username})
     refresh_token = create_refresh_token(data={"sub": user.username})
-    # app/controllers/user_controller.py (или где находится return)
 
     return {
-        # ИСПРАВЛЕНИЕ: Ключ должен быть "access_token" (все маленькие буквы)
         "access_token": access_token,
         "refreshToken": refresh_token,
         "tokenType": "bearer"
     }
 
 
+def get_all_users(session: Session) -> List[User]:
+    """Получение всех пользователей"""
+    return session.exec(select(User)).all()
 
+# --- НОВАЯ ФУНКЦИЯ ---
+def update_user_role(user_id: int, new_role: str, session: Session) -> User:
+    """Обновление роли пользователя (только для администратора)"""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден"
+        )
+
+    # Проверка, что новая роль допустима (например, "dispatcher", "admin")
+    # Можно добавить список разрешённых ролей
+    allowed_roles = ["dispatcher", "admin"] # Пример списка
+    if new_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Недопустимая роль. Допустимые значения: {allowed_roles}"
+        )
+
+    user.role = new_role
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 def get_all_users(session: Session) -> List[User]:
     """Получение всех пользователей"""

@@ -38,11 +38,12 @@ class FlightUpdate(BaseModel):
 class FlightResponse(BaseModel):
     """Схема ответа с данными рейса"""
     id: int
-    flightNumber: str
-    airlineName: str
-    departureAirportIcao: str
-    arrivalAirportIcao: str
-    departureDate: date
-    departureTime: time
-    totalSeats: int
-    freeSeats: int
+    # Добавляем alias для сопоставления с атрибутами модели Flight
+    flightNumber: str = Field(alias="flight_number")
+    airlineName: str = Field(alias="airline_name")
+    departureAirportIcao: str = Field(alias="departure_airport_icao")
+    arrivalAirportIcao: str = Field(alias="arrival_airport_icao")
+    departureDate: date = Field(alias="departure_date")
+    departureTime: time = Field(alias="departure_time")
+    totalSeats: int = Field(alias="total_seats")
+    freeSeats: int = Field(alias="free_seats")

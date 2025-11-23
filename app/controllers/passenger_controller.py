@@ -79,3 +79,31 @@ def delete_passenger(passenger_id: int, session: Session):
 
     session.delete(passenger)
     session.commit()
+
+def update_passenger(passenger_id: int, data: PassengerUpdate, session: Session) -> Passenger:
+    """Обновление данных пассажира по ID."""
+    passenger = session.get(Passenger, passenger_id)
+    if not passenger:
+        # Возвращаем None, чтобы эндпоинт мог обработать 404 ошибку
+        return None
+
+    # Преобразуем данные из Pydantic-схемы в словарь, исключая незаполненные поля
+    update_data = data.model_dump(exclude_unset=True)
+
+    # Преобразуем ключи из camelCase в snake_case для соответствия атрибутам модели SQLModel
+    snake_case_update_data = {}
+    for key, value in update_data.items():
+        # Простое преобразование camelCase в snake_case
+        # Например: passportNumber -> passport_number
+        snake_key = ''.join(['_' + c.lower() if c.isupper() else c for c in key]).lstrip('_')
+        snake_case_update_data[snake_key] = value
+
+    # Обновляем атрибуты пассажира
+    for key, value in snake_case_update_data.items():
+        setattr(passenger, key, value)
+
+    session.add(passenger)
+    session.commit()
+    session.refresh(passenger)
+    return passenger
+# ... (существующая функция delete_passenger)

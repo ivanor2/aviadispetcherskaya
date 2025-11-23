@@ -32,8 +32,8 @@ class PassengerUpdate(BaseModel):
 class PassengerResponse(BaseModel):
     """Схема ответа с данными пассажира"""
     id: int
-    passportNumber: str
-    passportIssuedBy: str
-    passportIssueDate: date
-    fullName: str
-    birthDate: date
+    passportNumber: str = Field(alias="passport_number")
+    passportIssuedBy: str = Field(alias="passport_issued_by")
+    passportIssueDate: date = Field(alias="passport_issue_date")
+    fullName: str = Field(alias="full_name")
+    birthDate: date = Field(alias="birth_date")

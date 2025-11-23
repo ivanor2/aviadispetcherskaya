@@ -1,19 +1,23 @@
 # app/api/v1/flight_router.py
 
-from fastapi import APIRouter, Depends, status, Response
+from fastapi import APIRouter, Depends, status, HTTPException, Response
 from sqlmodel import Session, select # Добавлен импорт select
-from app.db.session import get_session
+from app.db.session import get_session # Исправлен импорт
 from app.schemas.flight_schema import FlightCreate, FlightUpdate, FlightResponse
-from app.controllers.flight_controller import *
+from app.models.flight import Flight # Добавлен импорт модели Flight
+from app.controllers.flight_controller import (
+    create_flight,
+    get_all_flights,
+    get_flight_by_id,
+    get_flight_by_number,
+    update_flight,
+    delete_flight,
+    search_flights_by_arrival
+)
 from app.core.security import get_current_user, admin_required
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from typing import List
-
-# Удалены неправильные импорты, связанные с пассажирами
-# from app.controllers.passenger_controller import create_passenger, ...
-# from app.models.passenger import Passenger
-# from app.schemas.passenger_schema import PassengerResponse, PassengerCreate
 
 router = APIRouter(prefix="/flights", tags=["Авиарейсы"])
 
@@ -26,38 +30,22 @@ def create_flight_endpoint(
 ):
     """Создание рейса"""
     flight = create_flight(data, session)
-    return FlightResponse(
-        id=flight.id,
-        flightNumber=flight.flight_number,
-        airlineName=flight.airline_name,
-        departureAirportIcao=flight.departure_airport_icao,
-        arrivalAirportIcao=flight.arrival_airport_icao,
-        departureDate=flight.departure_date,
-        departureTime=flight.departure_time,
-        totalSeats=flight.total_seats,
-        freeSeats=flight.free_seats
-    )
+    # Возвращаем объект модели, Pydantic сам сопоставит поля через alias и from_attributes
+    return FlightResponse.model_validate(flight, from_attributes=True)
 
 @router.get("", response_model=Page[FlightResponse]) # Используем Page для пагинации
 def get_flights_endpoint(session: Session = Depends(get_session)):
     """Просмотр всех рейсов с пагинацией"""
+    # paginate возвращает Page[Flight], fastapi-pagination автоматически вызывает
+    # model_validate с from_attributes=True, если схема FlightResponse настроена с alias
     return paginate(session, select(Flight))
 
 @router.get("/{flight_id}", response_model=FlightResponse)
 def get_flight_endpoint(flight_id: int, session: Session = Depends(get_session)):
     """Получение рейса по ID"""
     flight = get_flight_by_id(flight_id, session)
-    return FlightResponse(
-        id=flight.id,
-        flightNumber=flight.flight_number,
-        airlineName=flight.airline_name,
-        departureAirportIcao=flight.departure_airport_icao,
-        arrivalAirportIcao=flight.arrival_airport_icao,
-        departureDate=flight.departure_date,
-        departureTime=flight.departure_time,
-        totalSeats=flight.total_seats,
-        freeSeats=flight.free_seats
-    )
+    # Возвращаем объект модели, Pydantic сам сопоставит поля через alias и from_attributes
+    return FlightResponse.model_validate(flight, from_attributes=True)
 
 @router.put("/{flight_id}", response_model=FlightResponse)
 def update_flight_endpoint(
@@ -69,18 +57,8 @@ def update_flight_endpoint(
     """Обновление рейса по ID"""
     flight = update_flight(flight_id, data, session)
     if not flight:
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
-    return FlightResponse(
-        id=flight.id,
-        flightNumber=flight.flight_number,
-        airlineName=flight.airline_name,
-        departureAirportIcao=flight.departure_airport_icao,
-        arrivalAirportIcao=flight.arrival_airport_icao,
-        departureDate=flight.departure_date,
-        departureTime=flight.departure_time,
-        totalSeats=flight.total_seats,
-        freeSeats=flight.free_seats
-    )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
+    return FlightResponse.model_validate(flight, from_attributes=True)
 
 @router.delete("/{flight_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_flight_endpoint(
@@ -97,17 +75,4 @@ def delete_flight_endpoint(
 def search_flights_by_arrival_endpoint(airport_query: str, session: Session = Depends(get_session)):
     """Поиск рейсов по аэропорту прибытия (частичное совпадение)"""
     flights = search_flights_by_arrival(airport_query, session)
-    return [
-        FlightResponse(
-            id=f.id,
-            flightNumber=f.flight_number,
-            airlineName=f.airline_name,
-            departureAirportIcao=f.departure_airport_icao,
-            arrivalAirportIcao=f.arrival_airport_icao,
-            departureDate=f.departure_date,
-            departureTime=f.departure_time,
-            totalSeats=f.total_seats,
-            freeSeats=f.free_seats
-        )
-        for f in flights
-    ]
+    return [FlightResponse.model_validate(f, from_attributes=True) for f in flights]
