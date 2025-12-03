@@ -4,6 +4,7 @@ from app.models.flight import Flight
 from app.models.booking import Booking
 from app.models.passenger import Passenger
 from app.models.user import User
+from app.models.airport import Airport
 engine = create_engine(DATABASE_URL, echo=True)
 
 

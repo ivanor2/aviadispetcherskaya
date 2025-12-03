@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from app.db.database import init_db, close_db
-from app.api.v1 import auth_router, flight_router, passenger_router, booking_router
+from app.api.v1 import auth_router, flight_router, passenger_router, booking_router, airport_router
 from fastapi_pagination import add_pagination
 
 
@@ -29,6 +29,7 @@ app_v1 = FastAPI(
 )
 
 # Подключение роутеров
+app_v1.include_router(airport_router.router)
 app_v1.include_router(auth_router.router)
 app_v1.include_router(flight_router.router)
 app_v1.include_router(passenger_router.router)

@@ -1,14 +1,16 @@
+# app/controllers/booking_controller.py
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
 from app.models.booking import Booking, generate_booking_code
 from app.models.flight import Flight
 from app.models.passenger import Passenger
 from typing import List
+from app.schemas.booking_schema import BookingCreate # <-- Импортируем схему
 
 
-def sell_ticket(flight_id: int, passenger_id: int, session: Session) -> Booking:
+def sell_ticket(data: BookingCreate, session: Session) -> Booking: # <-- Принимаем BookingCreate
     """Продажа билета"""
-    flight = session.get(Flight, flight_id)
+    flight = session.get(Flight, data.flightId) # <-- Используем data.flightId
     if not flight:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -21,18 +23,18 @@ def sell_ticket(flight_id: int, passenger_id: int, session: Session) -> Booking:
             detail="Нет свободных мест"
         )
 
-    passenger = session.get(Passenger, passenger_id)
+    passenger = session.get(Passenger, data.passengerId) # <-- Используем data.passengerId
     if not passenger:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Пассажир не найден"
+             detail="Пассажир не найден"
         )
 
     # Проверка на дубликат бронирования
     existing_booking = session.exec(
         select(Booking).where(
-            Booking.flight_id == flight_id,
-            Booking.passenger_id == passenger_id
+            Booking.flight_id == data.flightId, # <-- Используем data.flightId
+            Booking.passenger_id == data.passengerId # <-- Используем data.passengerId
         )
     ).first()
 
@@ -42,10 +44,16 @@ def sell_ticket(flight_id: int, passenger_id: int, session: Session) -> Booking:
             detail="Билет уже куплен"
         )
 
+    # --- ОПРЕДЕЛЕНИЕ booking_code ---
+    booking_code_to_use = data.bookingCode # <-- Извлекаем bookingCode из данных
+    if booking_code_to_use is None:
+        booking_code_to_use = generate_booking_code() # <-- Генерируем, если не задан
+    # --- /ОПРЕДЕЛЕНИЕ booking_code ---
+
     booking = Booking(
-        booking_code=generate_booking_code(),
-        flight_id=flight_id,
-        passenger_id=passenger_id
+        booking_code=booking_code_to_use, # <-- Используем выбранный код
+        flight_id=data.flightId, # <-- Используем data.flightId
+        passenger_id=data.passengerId # <-- Используем data.passengerId
     )
 
     flight.free_seats -= 1
@@ -56,6 +64,8 @@ def sell_ticket(flight_id: int, passenger_id: int, session: Session) -> Booking:
 
     return booking
 
+
+# --- (остальные функции остаются без изменений) ---
 
 def cancel_ticket(booking_id: int, session: Session):
     """Отмена билета"""

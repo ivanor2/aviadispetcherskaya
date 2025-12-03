@@ -1,3 +1,4 @@
+# app/api/v1/booking_router.py
 from fastapi import APIRouter, Depends, status, Response
 from sqlmodel import Session
 from app.db.session import get_session
@@ -11,12 +12,12 @@ router = APIRouter(prefix="/bookings", tags=["Бронирование"])
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
 def sell_ticket_endpoint(
-    data: BookingCreate,
+    data: BookingCreate, # <-- Принимаем BookingCreate
     session: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
     """Продажа билета"""
-    booking = sell_ticket(data.flightId, data.passengerId, session)
+    booking = sell_ticket(data, session) # <-- Передаём всю структуру data
     return BookingResponse(
         id=booking.id,
         bookingCode=booking.booking_code,
@@ -25,6 +26,8 @@ def sell_ticket_endpoint(
         createdAt=booking.created_at
     )
 
+
+# --- (остальные эндпоинты остаются без изменений) ---
 
 @router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
 def cancel_ticket_endpoint(
