@@ -6,7 +6,7 @@ import re
 class UserCreate(BaseModel):
     """Схема создания пользователя"""
     username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=8, examples=["string123!"])
 
     @field_validator('password')
     def password_complexity(cls, v):

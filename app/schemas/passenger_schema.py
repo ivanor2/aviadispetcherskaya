@@ -6,7 +6,7 @@ import re
 
 class PassengerCreate(BaseModel):
     """Схема создания пассажира"""
-    passportNumber: str = Field(..., description="Номер паспорта NNNN-NNNNNN")
+    passportNumber: str = Field(..., description="Номер паспорта NNNN-NNNNNN", examples=["1111-111111"])
     passportIssuedBy: str = Field(..., max_length=200)
     passportIssueDate: date
     fullName: str = Field(..., max_length=200)

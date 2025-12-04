@@ -49,7 +49,6 @@ def get_me(current_user=Depends(get_current_user)):
         role=current_user.role
     )
 
-# --- НОВЫЙ ЭНДПОИНТ ---
 @router.put("/{user_id}/role", response_model=UserResponse, dependencies=[Depends(admin_required)])
 def change_user_role(
     user_id: int,
@@ -69,9 +68,4 @@ def change_user_role(
 def get_all_users_endpoint(session: Session = Depends(get_session)):
     """Получение списка всех пользователей (только для администратора)"""
     users = get_all_users(session)
-    # fastapi-pagination автоматически обработает список объектов модели
-    # через model_validate с from_attributes=True, если схема настроена
-    # Но вручную конвертируем список, если не используется paginate
-    # Однако UserResponse не требует alias, так как поля совпадают
     return [UserResponse(id=u.id, username=u.username, role=u.role) for u in users]
-# --- /НОВЫЙ ЭНДПОИНТ ---

@@ -6,10 +6,10 @@ import re
 
 class FlightCreate(BaseModel):
     """Схема создания рейса"""
-    flightNumber: str = Field(..., description="Номер рейса в формате AAA-NNN")
+    flightNumber: str = Field(..., description="Номер рейса в формате AAA-NNN", examples=["111-AAA"])
     airlineName: str = Field(..., max_length=100)
-    departureAirportIcao: str = Field(..., min_length=4, max_length=4)
-    arrivalAirportIcao: str = Field(..., min_length=4, max_length=4)
+    departureAirportId: int  # Изменено: теперь принимает ID
+    arrivalAirportId: int    # Изменено: теперь принимает ID
     departureDate: date
     departureTime: time
     totalSeats: int = Field(..., gt=0)
@@ -22,28 +22,43 @@ class FlightCreate(BaseModel):
             raise ValueError('Номер рейса должен быть в формате AAA-NNN')
         return v
 
+    # Валидаторы для ID аэропортов (опционально, но рекомендуется)
+    @field_validator('departureAirportId', 'arrivalAirportId')
+    def validate_airport_id(cls, v):
+        if v <= 0:
+            raise ValueError('ID аэропорта должен быть положительным целым числом')
+        return v
 
 class FlightUpdate(BaseModel):
     """Схема обновления рейса"""
     flightNumber: Optional[str] = None
     airlineName: Optional[str] = None
-    departureAirportIcao: Optional[str] = None
-    arrivalAirportIcao: Optional[str] = None
+    departureAirportId: Optional[int] = None # Изменено: теперь ID
+    arrivalAirportId: Optional[int] = None   # Изменено: теперь ID
     departureDate: Optional[date] = None
     departureTime: Optional[time] = None
     totalSeats: Optional[int] = None
     freeSeats: Optional[int] = None
 
+    # Валидаторы для ID аэропортов (опционально, но рекомендуется)
+    @field_validator('departureAirportId', 'arrivalAirportId')
+    def validate_airport_id(cls, v):
+        if v is not None and v <= 0: # Проверяем только если значение передано
+            raise ValueError('ID аэропорта должен быть положительным целым числом')
+        return v
+
 
 class FlightResponse(BaseModel):
     """Схема ответа с данными рейса"""
     id: int
-    # Добавляем alias для сопоставления с атрибутами модели Flight
     flightNumber: str = Field(alias="flight_number")
     airlineName: str = Field(alias="airline_name")
-    departureAirportIcao: str = Field(alias="departure_airport_icao")
-    arrivalAirportIcao: str = Field(alias="arrival_airport_icao")
+    departureAirportId: int = Field(alias="departure_airport_id") # Изменено: теперь ID
+    arrivalAirportId: int = Field(alias="arrival_airport_id")     # Изменено: теперь ID
     departureDate: date = Field(alias="departure_date")
     departureTime: time = Field(alias="departure_time")
     totalSeats: int = Field(alias="total_seats")
     freeSeats: int = Field(alias="free_seats")
+
+    class Config:
+        from_attributes = True

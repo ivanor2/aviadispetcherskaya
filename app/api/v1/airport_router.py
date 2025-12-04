@@ -45,7 +45,7 @@ def get_airport_by_icao_endpoint(icao_code: str, session: Session = Depends(get_
 def create_airport_endpoint(
     data: AirportCreate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user=Depends(admin_required)
 ):
     """
     Создание нового аэропорта (только для администратора).
@@ -58,7 +58,7 @@ def update_airport_endpoint(
     airport_id: int,
     data: AirportUpdate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user=Depends(admin_required)
 ):
     """
     Обновление аэропорта по ID (только для администратора).
@@ -70,7 +70,7 @@ def update_airport_endpoint(
 def delete_airport_endpoint(
     airport_id: int,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user=Depends(admin_required)
 ):
     """
     Удаление аэропорта по ID (только для администратора).

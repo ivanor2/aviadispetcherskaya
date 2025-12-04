@@ -1,6 +1,3 @@
-# app/api/v1/passenger_router.py
-
-# ... (остальные импорты)
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlmodel import Session, select
 from typing import List
@@ -32,27 +29,26 @@ router = APIRouter(prefix="/passengers", tags=["Пассажиры"])
 def create_passenger_endpoint(
     data: PassengerCreate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user) # Аутентификация требуется
+    current_user = Depends(get_current_user)
 ):
-    """Регистрация пассажира."""
-    # Проверка на дубликат паспорта может быть в контроллере
     passenger = ctrl_create_passenger(data, session)
-    # Возвращаем объект модели, Pydantic сам сопоставит поля через alias и from_attributes
     return PassengerResponse.model_validate(passenger, from_attributes=True)
 
 
 @router.get("", response_model=Page[PassengerResponse]) # Используем Page для пагинации
 def get_passengers_endpoint(
     session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
 ):
     """Просмотр всех пассажиров с пагинацией."""
     return paginate(session, select(Passenger))
 
 
-@router.get("/{passenger_id}", response_model=PassengerResponse)
+@router.get("/{passenger_id}", response_model=PassengerResponse, dependencies=[Depends(get_current_user)])
 def get_passenger_endpoint(
     passenger_id: int,
     session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
 ):
     """Получение пассажира по ID."""
     passenger = ctrl_get_passenger_by_id(passenger_id, session)
@@ -76,13 +72,14 @@ def search_passenger_by_passport_endpoint(
 def search_passengers_by_name_endpoint(
     name: str,
     session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
 ):
     """Поиск пассажиров по ФИО (частичное совпадение)."""
     passengers = ctrl_find_passengers_by_name(name, session)
     return [PassengerResponse.model_validate(p, from_attributes=True) for p in passengers]
 
 
-@router.put("/{passenger_id}", response_model=PassengerResponse)
+@router.put("/{passenger_id}", response_model=PassengerResponse, dependencies=[Depends(get_current_user)])
 def update_passenger_endpoint(
     passenger_id: int,
     data: PassengerUpdate, # <-- Убедитесь, что параметр называется 'data'

@@ -1,5 +1,3 @@
-# app/api/v1/flight_router.py
-
 from fastapi import APIRouter, Depends, status, HTTPException, Response
 from sqlmodel import Session, select # Добавлен импорт select
 from app.db.session import get_session # Исправлен импорт
@@ -26,18 +24,15 @@ router = APIRouter(prefix="/flights", tags=["Авиарейсы"])
 def create_flight_endpoint(
     data: FlightCreate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user) # Предполагается, что создание доступно аутентифицированным пользователям
+    current_user = Depends(get_current_user)
 ):
     """Создание рейса"""
     flight = create_flight(data, session)
-    # Возвращаем объект модели, Pydantic сам сопоставит поля через alias и from_attributes
     return FlightResponse.model_validate(flight, from_attributes=True)
 
 @router.get("", response_model=Page[FlightResponse]) # Используем Page для пагинации
 def get_flights_endpoint(session: Session = Depends(get_session)):
     """Просмотр всех рейсов с пагинацией"""
-    # paginate возвращает Page[Flight], fastapi-pagination автоматически вызывает
-    # model_validate с from_attributes=True, если схема FlightResponse настроена с alias
     return paginate(session, select(Flight))
 
 @router.get("/{flight_id}", response_model=FlightResponse)
@@ -52,7 +47,8 @@ def update_flight_endpoint(
     flight_id: int,
     data: FlightUpdate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user) # Аутентификация требуется
+    current_user=Depends(admin_required)
+ # Аутентификация требуется
 ):
     """Обновление рейса по ID"""
     flight = update_flight(flight_id, data, session)

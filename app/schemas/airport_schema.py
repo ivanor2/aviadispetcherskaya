@@ -25,7 +25,7 @@ VALID_ICAO_PREFIXES = {
 # --- /НОВОЕ ---
 
 class AirportCreate(BaseModel):
-    icaoCode: str = Field(..., description="Официальный ICAO-код аэропорта (2-4 символа)")
+    icaoCode: str = Field(..., description="Официальный ICAO-код аэропорта (2-4 символа)", examples=["UUSS"])
     name: str = Field(..., max_length=200, description="Название аэропорта или страны")
 
     @field_validator('icaoCode')

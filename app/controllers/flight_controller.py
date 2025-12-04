@@ -38,10 +38,8 @@ def create_flight(data: FlightCreate, session: Session) -> Flight:
     flight = Flight(
         flight_number=data.flightNumber,
         airline_name=data.airlineName,
-        # --- ИЗМЕНЕНО: Сохраняем id аэропортов ---
         departure_airport_id=data.departureAirportId,
         arrival_airport_id=data.arrivalAirportId,
-        # --- /ИЗМЕНЕНО ---
         departure_date=data.departureDate,
         departure_time=data.departureTime,
         total_seats=data.totalSeats,
@@ -90,26 +88,34 @@ def update_flight(flight_id: int, data: FlightUpdate, session: Session) -> Fligh
 
     # --- ИЗМЕНЕНО: Проверка существования новых аэропортов по id, если они меняются ---
     update_data = data.model_dump(exclude_unset=True)
-    if 'departureAirportId' in update_data:
-        dep_airport = session.get(Airport, update_data['departureAirportId'])
+
+    # Преобразуем camelCase в snake_case для всех полей, включая ID аэропортов
+    snake_case_update_data = {}
+    for key, value in update_data.items():
+        snake_key = ''.join(['_' + c.lower() if c.isupper() else c for c in key]).lstrip('_')
+        snake_case_update_data[snake_key] = value
+
+    # Проверяем, меняются ли ID аэропортов
+    if 'departure_airport_id' in snake_case_update_data:
+        dep_airport_id = snake_case_update_data['departure_airport_id']
+        dep_airport = session.get(Airport, dep_airport_id)
         if not dep_airport:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Аэропорт отправления с id {update_data['departureAirportId']} не найден"
+                detail=f"Аэропорт отправления с id {dep_airport_id} не найден"
             )
-    if 'arrivalAirportId' in update_data:
-        arr_airport = session.get(Airport, update_data['arrivalAirportId'])
+    if 'arrival_airport_id' in snake_case_update_data:
+        arr_airport_id = snake_case_update_data['arrival_airport_id']
+        arr_airport = session.get(Airport, arr_airport_id)
         if not arr_airport:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Аэропорт прибытия с id {update_data['arrivalAirportId']} не найден"
+                detail=f"Аэропорт прибытия с id {arr_airport_id} не найден"
             )
-    # --- /ИЗМЕНЕНО ---
 
-    for key, value in update_data.items():
-        # Преобразование camelCase в snake_case
-        snake_key = ''.join(['_' + c.lower() if c.isupper() else c for c in key]).lstrip('_')
-        setattr(flight, snake_key, value)
+    # Применяем обновленные данные
+    for key, value in snake_case_update_data.items():
+        setattr(flight, key, value)
 
     session.add(flight)
     session.commit()
