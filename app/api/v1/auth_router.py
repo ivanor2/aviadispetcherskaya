@@ -54,7 +54,7 @@ def change_user_role(
     user_id: int,
     new_role: UserUpdateRole, # Используем новую схему
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user) # Опционально, можно убрать, так как admin_required уже проверяет
+    current_user = Depends(get_current_user)
 ):
     """Изменение роли пользователя (только для администратора)"""
     updated_user = update_user_role(user_id, new_role.role, session)

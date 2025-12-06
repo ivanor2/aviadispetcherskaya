@@ -12,7 +12,7 @@ from app.controllers.flight_controller import (
     delete_flight,
     search_flights_by_arrival
 )
-from app.core.security import get_current_user, admin_required
+from app.core.security import get_current_user, admin_required, dispatcher_or_higher
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from typing import List
@@ -24,19 +24,21 @@ router = APIRouter(prefix="/flights", tags=["Авиарейсы"])
 def create_flight_endpoint(
     data: FlightCreate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(dispatcher_or_higher)
 ):
     """Создание рейса"""
     flight = create_flight(data, session)
     return FlightResponse.model_validate(flight, from_attributes=True)
 
 @router.get("", response_model=Page[FlightResponse]) # Используем Page для пагинации
-def get_flights_endpoint(session: Session = Depends(get_session)):
+def get_flights_endpoint(session: Session = Depends(get_session),
+                         current_user = Depends(get_current_user)):
     """Просмотр всех рейсов с пагинацией"""
     return paginate(session, select(Flight))
 
 @router.get("/{flight_id}", response_model=FlightResponse)
-def get_flight_endpoint(flight_id: int, session: Session = Depends(get_session)):
+def get_flight_endpoint(flight_id: int, session: Session = Depends(get_session),
+                        current_user = Depends(get_current_user)):
     """Получение рейса по ID"""
     flight = get_flight_by_id(flight_id, session)
     # Возвращаем объект модели, Pydantic сам сопоставит поля через alias и from_attributes
@@ -68,7 +70,8 @@ def delete_flight_endpoint(
 
 # --- Поиск ---
 @router.get("/search/by-arrival/{airport_query}", response_model=List[FlightResponse])
-def search_flights_by_arrival_endpoint(airport_query: str, session: Session = Depends(get_session)):
+def search_flights_by_arrival_endpoint(airport_query: str, session: Session = Depends(get_session),
+                                       current_user = Depends(get_current_user)):
     """Поиск рейсов по аэропорту прибытия (частичное совпадение)"""
     flights = search_flights_by_arrival(airport_query, session)
     return [FlightResponse.model_validate(f, from_attributes=True) for f in flights]

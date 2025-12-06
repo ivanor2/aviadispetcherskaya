@@ -4,13 +4,21 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
-from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.db.session import get_session
 from app.models.user import User
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def hash_password(password: str) -> str:
     """Хеширование пароля"""
@@ -81,5 +89,14 @@ def admin_required(user=Depends(get_current_user)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Требуются права администратора"
+        )
+    return user
+
+def dispatcher_or_higher(user = Depends(get_current_user)):
+    """Проверка, что пользователь авторизован и имеет роль dispatcher или выше (admin)."""
+    if user.role == "guest":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуется роль диспетчера или выше"
         )
     return user

@@ -4,7 +4,7 @@ from sqlmodel import Session
 from app.db.session import get_session
 from app.schemas.booking_schema import BookingCreate, BookingResponse
 from app.controllers.booking_controller import *
-from app.core.security import get_current_user, admin_required
+from app.core.security import get_current_user, admin_required, dispatcher_or_higher
 from typing import List
 
 router = APIRouter(prefix="/bookings", tags=["Бронирование"])
@@ -14,10 +14,10 @@ router = APIRouter(prefix="/bookings", tags=["Бронирование"])
 def sell_ticket_endpoint(
     data: BookingCreate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user) # Аутентификация требуется
+    current_user = Depends(dispatcher_or_higher) # Аутентификация требуется
 ):
     """Продажа билета"""
-    booking = sell_ticket(data, session) # <-- Передаём всю структуру data
+    booking = sell_ticket(data, session)
     return BookingResponse.model_validate(booking, from_attributes=True)
 
 
@@ -37,7 +37,7 @@ def cancel_ticket_endpoint(
 def get_bookings_by_flight_endpoint(
     flight_id: int,
     session: Session = Depends(get_session),
-    current_user=Depends(get_current_user)
+    current_user=Depends(dispatcher_or_higher)
 ):
     """Получение бронирований по рейсу"""
     bookings = get_bookings_by_flight(flight_id, session)
@@ -48,7 +48,8 @@ def get_bookings_by_flight_endpoint(
 @router.get("/by-passenger/{passport}", response_model=List[BookingResponse])
 def get_bookings_by_passenger_endpoint(
     passport: str,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
 ):
     """Получение бронирований по паспорту пассажира"""
     bookings = get_bookings_by_passenger(passport, session)
@@ -56,7 +57,8 @@ def get_bookings_by_passenger_endpoint(
 
 
 @router.get("", response_model=List[BookingResponse], dependencies=[Depends(get_current_user)])
-def get_all_bookings_endpoint(session: Session = Depends(get_session)):
+def get_all_bookings_endpoint(session: Session = Depends(get_session),
+                              current_user=Depends(dispatcher_or_higher)):
     """Получение списка всех бронирований (требуется аутентификация)"""
     bookings = get_all_bookings(session)
     return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]

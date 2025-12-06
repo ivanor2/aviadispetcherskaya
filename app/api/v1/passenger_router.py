@@ -18,7 +18,7 @@ from app.controllers.passenger_controller import (
     delete_passenger as ctrl_delete_passenger,
     update_passenger as ctrl_update_passenger # Добавлен импорт
 )
-from app.core.security import get_current_user, admin_required
+from app.core.security import get_current_user, admin_required, dispatcher_or_higher
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/passengers", tags=["Пассажиры"])
 def create_passenger_endpoint(
     data: PassengerCreate,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(dispatcher_or_higher)
 ):
     passenger = ctrl_create_passenger(data, session)
     return PassengerResponse.model_validate(passenger, from_attributes=True)
@@ -38,7 +38,7 @@ def create_passenger_endpoint(
 @router.get("", response_model=Page[PassengerResponse]) # Используем Page для пагинации
 def get_passengers_endpoint(
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(dispatcher_or_higher)
 ):
     """Просмотр всех пассажиров с пагинацией."""
     return paginate(session, select(Passenger))
@@ -48,7 +48,7 @@ def get_passengers_endpoint(
 def get_passenger_endpoint(
     passenger_id: int,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(dispatcher_or_higher)
 ):
     """Получение пассажира по ID."""
     passenger = ctrl_get_passenger_by_id(passenger_id, session)
@@ -59,6 +59,7 @@ def get_passenger_endpoint(
 def search_passenger_by_passport_endpoint(
     passport: str,
     session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
 ):
     """Поиск пассажира по серии и номеру паспорта."""
     passenger = ctrl_find_passenger_by_passport(passport, session)
@@ -72,7 +73,7 @@ def search_passenger_by_passport_endpoint(
 def search_passengers_by_name_endpoint(
     name: str,
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(dispatcher_or_higher)
 ):
     """Поиск пассажиров по ФИО (частичное совпадение)."""
     passengers = ctrl_find_passengers_by_name(name, session)
@@ -84,7 +85,7 @@ def update_passenger_endpoint(
     passenger_id: int,
     data: PassengerUpdate, # <-- Убедитесь, что параметр называется 'data'
     session: Session = Depends(get_session),
-    current_user = Depends(get_current_user) # Аутентификация требуется
+    current_user = Depends(admin_required) # Аутентификация требуется
 ):
     """Обновление данных пассажира по ID."""
     passenger = ctrl_update_passenger(passenger_id, data, session) # <-- Используем 'data'

@@ -19,7 +19,7 @@ def create_user(data: UserCreate, session: Session) -> User:
     user = User(
         username=data.username,
         password=hash_password(data.password),
-        role="dispatcher"
+        role="guest"
     )
     session.add(user)
     session.commit()
@@ -40,6 +40,7 @@ def authenticate_user(username: str, password: str, session: Session):
     refresh_token = create_refresh_token(data={"sub": user.username})
 
     return {
+
         "access_token": access_token,
         "refreshToken": refresh_token,
         "tokenType": "bearer"
@@ -62,7 +63,7 @@ def update_user_role(user_id: int, new_role: str, session: Session) -> User:
 
     # Проверка, что новая роль допустима (например, "dispatcher", "admin")
     # Можно добавить список разрешённых ролей
-    allowed_roles = ["dispatcher", "admin"] # Пример списка
+    allowed_roles = ["dispatcher", "admin", "guest"] # Пример списка
     if new_role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
