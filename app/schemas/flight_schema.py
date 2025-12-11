@@ -62,3 +62,22 @@ class FlightResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# app/schemas/flight_schema.py
+
+# (в конце файла)
+
+class PassengerBrief(BaseModel):
+    fullName: str = Field(alias="full_name")
+    passportNumber: str = Field(alias="passport_number")
+
+    class Config:
+        from_attributes = True
+
+
+class FlightWithPassengersResponse(BaseModel):
+    flight: FlightResponse
+    passengers: list[PassengerBrief]
+
+    class Config:
+        from_attributes = True

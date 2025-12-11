@@ -1,4 +1,3 @@
-# app/controllers/user_controller.py
 from sqlmodel import Session, select
 from fastapi import HTTPException, status # Убедитесь, что импортированы
 from app.models.user import User
@@ -75,7 +74,3 @@ def update_user_role(user_id: int, new_role: str, session: Session) -> User:
     session.commit()
     session.refresh(user)
     return user
-
-def get_all_users(session: Session) -> List[User]:
-    """Получение всех пользователей"""
-    return session.exec(select(User)).all()

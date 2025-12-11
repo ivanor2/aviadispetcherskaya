@@ -1,9 +1,12 @@
 # app/controllers/flight_controller.py
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, delete
 from fastapi import HTTPException, status
+
+from app.models.booking import Booking
 from app.models.flight import Flight
 from app.models.airport import Airport # <-- Добавлен импорт
+from app.models.passenger import Passenger
 from app.schemas.flight_schema import FlightCreate, FlightUpdate
 from typing import List, Optional
 
@@ -153,3 +156,55 @@ def search_flights_by_arrival(airport_query: str, session: Session) -> List[Flig
         select(Flight).where(Flight.arrival_airport_id.in_(matching_airports))
     ).all()
     return flights
+
+# app/controllers/flight_controller.py
+
+# (в конце файла, после search_flights_by_arrival)
+
+def get_flight_with_passengers_by_number(flight_number: str, session: Session):
+    """
+    Получение рейса по номеру с полной информацией о пассажирах.
+    """
+    flight = session.exec(
+        select(Flight).where(Flight.flight_number == flight_number)
+    ).first()
+
+    if not flight:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Рейс не найден"
+        )
+
+    # Получаем все бронирования для этого рейса
+    bookings = session.exec(
+        select(Booking).where(Booking.flight_id == flight.id)
+    ).all()
+
+    # Получаем пассажиров по их ID из бронирований
+    passenger_ids = [b.passenger_id for b in bookings]
+    passengers = []
+    if passenger_ids:
+        passengers = session.exec(
+            select(Passenger).where(Passenger.id.in_(passenger_ids))
+        ).all()
+
+    return flight, passengers
+
+# app/controllers/flight_controller.py
+
+# app/controllers/flight_controller.py
+
+def delete_all_flights(session: Session):
+    """
+    Удаляет все авиарейсы и связанные с ними бронирования.
+    """
+
+    flight_ids_result = session.exec(select(Flight.id))
+    flight_ids = flight_ids_result.all()
+
+    if flight_ids:
+        session.exec(delete(Booking).where(Booking.flight_id.in_(flight_ids)))
+
+    session.exec(delete(Flight))
+
+    session.commit()

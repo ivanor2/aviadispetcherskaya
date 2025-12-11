@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, status, HTTPException, Response
 from sqlmodel import Session, select # Добавлен импорт select
 from app.db.session import get_session # Исправлен импорт
 from app.schemas.flight_schema import FlightCreate, FlightUpdate, FlightResponse
-from app.models.flight import Flight # Добавлен импорт модели Flight
+from app.models.flight import Flight
+from app.schemas.flight_schema import FlightWithPassengersResponse, PassengerBrief
 from app.controllers.flight_controller import (
     create_flight,
     get_all_flights,
@@ -10,7 +11,9 @@ from app.controllers.flight_controller import (
     get_flight_by_number,
     update_flight,
     delete_flight,
-    search_flights_by_arrival
+    search_flights_by_arrival,
+    get_flight_with_passengers_by_number,
+    delete_all_flights
 )
 from app.core.security import get_current_user, admin_required, dispatcher_or_higher
 from fastapi_pagination import Page
@@ -75,3 +78,34 @@ def search_flights_by_arrival_endpoint(airport_query: str, session: Session = De
     """Поиск рейсов по аэропорту прибытия (частичное совпадение)"""
     flights = search_flights_by_arrival(airport_query, session)
     return [FlightResponse.model_validate(f, from_attributes=True) for f in flights]
+
+@router.get("/by-number/{flight_number}", response_model=FlightWithPassengersResponse)
+def get_flight_by_number_with_passengers_endpoint(
+    flight_number: str,
+    session: Session = Depends(get_session),
+    current_user = Depends(dispatcher_or_higher)
+):
+    """
+    Поиск авиарейса по номеру с информацией о пассажирах.
+    """
+    flight, passengers = get_flight_with_passengers_by_number(flight_number, session)
+    flight_response = FlightResponse.model_validate(flight, from_attributes=True)
+    passengers_response = [
+        PassengerBrief.model_validate(p, from_attributes=True) for p in passengers
+    ]
+    return FlightWithPassengersResponse(flight=flight_response, passengers=passengers_response)
+# ← должен быть импорт
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_required)])
+def delete_all_flights_endpoint(
+    confirm: bool = False,
+    session: Session = Depends(get_session),
+    current_user=Depends(admin_required)
+):
+    if not confirm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Подтвердите удаление: ?confirm=true"
+        )
+    delete_all_flights(session)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

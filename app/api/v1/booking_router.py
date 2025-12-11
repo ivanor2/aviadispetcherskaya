@@ -1,6 +1,8 @@
 # app/api/v1/booking_router.py
 from fastapi import APIRouter, Depends, status, Response
-from sqlmodel import Session
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+from sqlmodel import Session, select
 from app.db.session import get_session
 from app.schemas.booking_schema import BookingCreate, BookingResponse
 from app.controllers.booking_controller import *
@@ -56,9 +58,9 @@ def get_bookings_by_passenger_endpoint(
     return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
 
 
-@router.get("", response_model=List[BookingResponse], dependencies=[Depends(get_current_user)])
-def get_all_bookings_endpoint(session: Session = Depends(get_session),
-                              current_user=Depends(dispatcher_or_higher)):
-    """Получение списка всех бронирований (требуется аутентификация)"""
-    bookings = get_all_bookings(session)
-    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
+@router.get("", response_model=Page[BookingResponse])
+def get_all_bookings_paginated(
+    session: Session = Depends(get_session),
+    current_user=Depends(dispatcher_or_higher)
+):
+    return paginate(session, select(Booking))

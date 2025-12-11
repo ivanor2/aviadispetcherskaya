@@ -1,7 +1,9 @@
  # app/api/v1/airport_router.py
 
 from fastapi import APIRouter, Depends, status
-from sqlmodel import Session
+from sqlmodel import Session, select
+
+from app.models.airport import Airport
 from app.db.session import get_session
 from app.schemas.airport_schema import AirportCreate, AirportUpdate, AirportResponse
 from app.controllers.airport_controller import (
@@ -14,17 +16,18 @@ from app.controllers.airport_controller import (
 )
 from app.core.security import admin_required, get_current_user, dispatcher_or_higher
 from typing import List
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
 
 router = APIRouter(prefix="/airports", tags=["Аэропорты"])
 
-@router.get("", response_model=List[AirportResponse])
-def get_airports_list(session: Session = Depends(get_session),
-                    current_user = Depends(get_current_user)):
-    """
-    Получение списка всех аэропортов (id, ИКАО и название).
-    """
-    airports = get_all_airports(session)
-    return [AirportResponse.model_validate(a, from_attributes=True) for a in airports]
+# Вместо get_airports_list:
+@router.get(" ", response_model=Page[AirportResponse])
+def get_airports_paginated(
+    session: Session = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    return paginate(session, select(Airport))
 
 @router.get("/{airport_id}", response_model=AirportResponse)
 def get_airport_by_id_endpoint(airport_id: int, session: Session = Depends(get_session),
