@@ -1,4 +1,4 @@
-    # Airport Dispatcher API
+# Airport Dispatcher API
 
 REST API для АРМ диспетчера аэропорта.
 

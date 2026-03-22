@@ -22,7 +22,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 router = APIRouter(prefix="/airports", tags=["Аэропорты"])
 
 # Вместо get_airports_list:
-@router.get(" ", response_model=Page[AirportResponse])
+@router.get("", response_model=Page[AirportResponse])
 def get_airports_paginated(
     session: Session = Depends(get_session),
     current_user=Depends(get_current_user)
