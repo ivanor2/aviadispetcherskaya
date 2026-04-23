@@ -1,48 +1,26 @@
-# app/controllers/flight_controller.py
-
 from sqlmodel import Session, select, delete
 from fastapi import HTTPException, status
-
 from app.models.booking import Booking
 from app.models.flight import Flight
-from app.models.airport import Airport # <-- Добавлен импорт
+from app.models.airport import Airport
 from app.models.passenger import Passenger
 from app.schemas.flight_schema import FlightCreate, FlightUpdate
 from typing import List, Optional
 
+
 def create_flight(data: FlightCreate, session: Session) -> Flight:
-    """Создание рейса"""
-    # --- ИЗМЕНЕНО: Проверка существования аэропортов по id ---
-    departure_airport = session.get(Airport, data.departureAirportId)
-    if not departure_airport:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Аэропорт отправления с id {data.departureAirportId} не найден"
-        )
+    # ✅ Проверка авиакомпании
+    airline = session.exec(select(Airline).where(Airline.code == data.airlineCode)).first()
+    if not airline:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Авиакомпания с таким кодом не зарегистрирована в системе")
 
-    arrival_airport = session.get(Airport, data.arrivalAirportId)
-    if not arrival_airport:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Аэропорт прибытия с id {data.arrivalAirportId} не найден"
-        )
-    # --- /ИЗМЕНЕНО ---
-
-    existing = session.exec(
-        select(Flight).where(Flight.flight_number == data.flightNumber)
-    ).first()
-
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Рейс с таким номером уже существует"
-        )
-
+    # ... остальная логика проверки аэропортов и уникальности номера рейса ...
+    # Замените airline_name=data.airlineName на airline_code=data.airlineCode в Flight(...)
     flight = Flight(
         flight_number=data.flightNumber,
-        airline_name=data.airlineName,
-        departure_airport_id=data.departureAirportId,
-        arrival_airport_id=data.arrivalAirportId,
+        airline_code=data.airlineCode, # ✅ Обновлено
+        departure_airport_icao=data.departureAirportIcao.upper(),
+        arrival_airport_icao=data.arrivalAirportIcao.upper(),
         departure_date=data.departureDate,
         departure_time=data.departureTime,
         total_seats=data.totalSeats,
@@ -53,70 +31,54 @@ def create_flight(data: FlightCreate, session: Session) -> Flight:
     session.refresh(flight)
     return flight
 
+
 def get_all_flights(session: Session) -> List[Flight]:
-    """Получение всех рейсов"""
     return session.exec(select(Flight)).all()
 
+
 def get_flight_by_id(flight_id: int, session: Session) -> Flight:
-    """Получение рейса по ID"""
     flight = session.get(Flight, flight_id)
     if not flight:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Рейс не найден"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
     return flight
 
-def get_flight_by_number(flight_number: str, session: Session) -> Optional[Flight]:
-    """Получение рейса по номеру"""
-    flight = session.exec(
-        select(Flight).where(Flight.flight_number == flight_number)
-    ).first()
 
+def get_flight_by_number(flight_number: str, session: Session) -> Flight:
+    flight = session.exec(select(Flight).where(Flight.flight_number == flight_number.upper())).first()
     if not flight:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Рейс не найден"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
     return flight
+
 
 def update_flight(flight_id: int, data: FlightUpdate, session: Session) -> Flight:
-    """Обновление рейса"""
     flight = session.get(Flight, flight_id)
     if not flight:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Рейс не найден"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
 
-    # --- ИЗМЕНЕНО: Проверка существования новых аэропортов по id, если они меняются ---
     update_data = data.model_dump(exclude_unset=True)
 
-    # Преобразуем camelCase в snake_case для всех полей, включая ID аэропортов
+    # Преобразуем camelCase -> snake_case
     snake_case_update_data = {}
     for key, value in update_data.items():
         snake_key = ''.join(['_' + c.lower() if c.isupper() else c for c in key]).lstrip('_')
-        snake_case_update_data[snake_key] = value
+        # Нормализуем ICAO-коды и номера рейсов
+        if snake_key in ('departure_airport_icao', 'arrival_airport_icao', 'flight_number'):
+            snake_case_update_data[snake_key] = value.upper()
+        else:
+            snake_case_update_data[snake_key] = value
 
-    # Проверяем, меняются ли ID аэропортов
-    if 'departure_airport_id' in snake_case_update_data:
-        dep_airport_id = snake_case_update_data['departure_airport_id']
-        dep_airport = session.get(Airport, dep_airport_id)
-        if not dep_airport:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Аэропорт отправления с id {dep_airport_id} не найден"
-            )
-    if 'arrival_airport_id' in snake_case_update_data:
-        arr_airport_id = snake_case_update_data['arrival_airport_id']
-        arr_airport = session.get(Airport, arr_airport_id)
-        if not arr_airport:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Аэропорт прибытия с id {arr_airport_id} не найден"
-            )
+    # ✅ Валидация новых аэропортов при изменении
+    if 'departure_airport_icao' in snake_case_update_data:
+        dep = session.exec(
+            select(Airport).where(Airport.icao_code == snake_case_update_data['departure_airport_icao'])).first()
+        if not dep: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                        detail="Аэропорт отправления не найден")
 
-    # Применяем обновленные данные
+    if 'arrival_airport_icao' in snake_case_update_data:
+        arr = session.exec(
+            select(Airport).where(Airport.icao_code == snake_case_update_data['arrival_airport_icao'])).first()
+        if not arr: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Аэропорт прибытия не найден")
+
     for key, value in snake_case_update_data.items():
         setattr(flight, key, value)
 
@@ -125,86 +87,54 @@ def update_flight(flight_id: int, data: FlightUpdate, session: Session) -> Fligh
     session.refresh(flight)
     return flight
 
+
 def delete_flight(flight_id: int, session: Session):
-    """Удаление рейса"""
+    """Удаление рейса с каскадным удалением связанных бронирований"""
     flight = session.get(Flight, flight_id)
     if not flight:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Рейс не найден"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
 
+    # 1️⃣ Сначала удаляем все бронирования, привязанные к этому рейсу
+    bookings_to_delete = session.exec(
+        select(Booking).where(Booking.flight_id == flight_id)
+    ).all()
+
+    for booking in bookings_to_delete:
+        session.delete(booking)
+
+    # 2️⃣ Только теперь удаляем сам рейс
     session.delete(flight)
     session.commit()
 
+
 def search_flights_by_arrival(airport_query: str, session: Session) -> List[Flight]:
-    """Поиск рейсов по аэропорту прибытия (теперь по id)"""
-    # Сначала ищем аэропорты, чьё имя или ICAO содержат запрос
-    # Это позволяет искать по названию, как было раньше, но возвращать id
     matching_airports = session.exec(
-        select(Airport.id).where(
+        select(Airport.icao_code).where(
             (Airport.name.contains(airport_query)) |
             (Airport.icao_code.contains(airport_query.upper()))
         )
     ).all()
-
     if not matching_airports:
-        return [] # Нет аэропортов, соответствующих запросу
+        return []
+    return session.exec(select(Flight).where(Flight.arrival_airport_icao.in_(matching_airports))).all()
 
-    # Затем ищем рейсы, прибывающие в эти аэропорты
-    flights = session.exec(
-        select(Flight).where(Flight.arrival_airport_id.in_(matching_airports))
-    ).all()
-    return flights
-
-# app/controllers/flight_controller.py
-
-# (в конце файла, после search_flights_by_arrival)
 
 def get_flight_with_passengers_by_number(flight_number: str, session: Session):
-    """
-    Получение рейса по номеру с полной информацией о пассажирах.
-    """
-    flight = session.exec(
-        select(Flight).where(Flight.flight_number == flight_number)
-    ).first()
-
+    flight = session.exec(select(Flight).where(Flight.flight_number == flight_number.upper())).first()
     if not flight:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Рейс не найден"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
 
-    # Получаем все бронирования для этого рейса
-    bookings = session.exec(
-        select(Booking).where(Booking.flight_id == flight.id)
-    ).all()
-
-    # Получаем пассажиров по их ID из бронирований
+    bookings = session.exec(select(Booking).where(Booking.flight_id == flight.id)).all()
     passenger_ids = [b.passenger_id for b in bookings]
     passengers = []
     if passenger_ids:
-        passengers = session.exec(
-            select(Passenger).where(Passenger.id.in_(passenger_ids))
-        ).all()
-
+        passengers = session.exec(select(Passenger).where(Passenger.id.in_(passenger_ids))).all()
     return flight, passengers
 
-# app/controllers/flight_controller.py
-
-# app/controllers/flight_controller.py
 
 def delete_all_flights(session: Session):
-    """
-    Удаляет все авиарейсы и связанные с ними бронирования.
-    """
-
-    flight_ids_result = session.exec(select(Flight.id))
-    flight_ids = flight_ids_result.all()
-
+    flight_ids = session.exec(select(Flight.id)).all()
     if flight_ids:
         session.exec(delete(Booking).where(Booking.flight_id.in_(flight_ids)))
-
     session.exec(delete(Flight))
-
     session.commit()

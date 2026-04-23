@@ -1,83 +1,69 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from datetime import date, time
-from typing import Optional
+from typing import Optional, List
 import re
 
-
 class FlightCreate(BaseModel):
-    """Схема создания рейса"""
-    flightNumber: str = Field(..., description="Номер рейса в формате AAA-NNN", examples=["111-AAA"])
-    airlineName: str = Field(..., max_length=100)
-    departureAirportId: int  # Изменено: теперь принимает ID
-    arrivalAirportId: int    # Изменено: теперь принимает ID
+    flightNumber: str = Field(..., description="Номер рейса в формате AAA-NNN")
+    airlineCode: str = Field(..., min_length=3, max_length=3, description="Код авиакомпании")
+    departureAirportIcao: str = Field(..., max_length=4)
+    arrivalAirportIcao: str = Field(..., max_length=4)
     departureDate: date
     departureTime: time
     totalSeats: int = Field(..., gt=0)
     freeSeats: int = Field(..., ge=0)
 
     @field_validator('flightNumber')
+    @classmethod
     def validate_flight_number(cls, v):
-        pattern = r'^[A-Z]{2,3}-\d{3}$'
-        if not re.match(pattern, v):
-            raise ValueError('Номер рейса должен быть в формате AAA-NNN')
-        return v
+        if not re.match(r'^[A-Z]{3}-\d{3}$', v.upper()):
+            raise ValueError('Номер рейса должен быть строго в формате AAA-NNN')
+        return v.upper()
 
-    # Валидаторы для ID аэропортов (опционально, но рекомендуется)
-    @field_validator('departureAirportId', 'arrivalAirportId')
-    def validate_airport_id(cls, v):
-        if v <= 0:
-            raise ValueError('ID аэропорта должен быть положительным целым числом')
-        return v
+    @field_validator('airlineCode')
+    @classmethod
+    def validate_airline_code(cls, v):
+        return v.upper()
+
+    @model_validator(mode='after')
+    def check_prefix_match(self):
+        prefix = self.flightNumber.split('-')[0]
+        if prefix != self.airlineCode:
+            raise ValueError(f'Префикс номера рейса ({prefix}) должен совпадать с кодом авиакомпании ({self.airlineCode})')
+        return self
 
 class FlightUpdate(BaseModel):
-    """Схема обновления рейса"""
     flightNumber: Optional[str] = None
-    airlineName: Optional[str] = None
-    departureAirportId: Optional[int] = None # Изменено: теперь ID
-    arrivalAirportId: Optional[int] = None   # Изменено: теперь ID
+    airlineCode: Optional[str] = None
+    departureAirportIcao: Optional[str] = None
+    arrivalAirportIcao: Optional[str] = None
     departureDate: Optional[date] = None
     departureTime: Optional[time] = None
     totalSeats: Optional[int] = None
     freeSeats: Optional[int] = None
 
-    # Валидаторы для ID аэропортов (опционально, но рекомендуется)
-    @field_validator('departureAirportId', 'arrivalAirportId')
-    def validate_airport_id(cls, v):
-        if v is not None and v <= 0: # Проверяем только если значение передано
-            raise ValueError('ID аэропорта должен быть положительным целым числом')
-        return v
-
-
 class FlightResponse(BaseModel):
-    """Схема ответа с данными рейса"""
     id: int
     flightNumber: str = Field(alias="flight_number")
-    airlineName: str = Field(alias="airline_name")
-    departureAirportId: int = Field(alias="departure_airport_id") # Изменено: теперь ID
-    arrivalAirportId: int = Field(alias="arrival_airport_id")     # Изменено: теперь ID
+    airlineCode: str = Field(alias="airline_code") # ✅ Обновлено
+    departureAirportIcao: str = Field(alias="departure_airport_icao")
+    arrivalAirportIcao: str = Field(alias="arrival_airport_icao")
     departureDate: date = Field(alias="departure_date")
     departureTime: time = Field(alias="departure_time")
     totalSeats: int = Field(alias="total_seats")
     freeSeats: int = Field(alias="free_seats")
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
-    class Config:
-        from_attributes = True
-
-# app/schemas/flight_schema.py
-
-# (в конце файла)
 
 class PassengerBrief(BaseModel):
+    id: int
     fullName: str = Field(alias="full_name")
     passportNumber: str = Field(alias="passport_number")
+    birthDate: date = Field(alias="birth_date")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FlightWithPassengersResponse(BaseModel):
     flight: FlightResponse
-    passengers: list[PassengerBrief]
-
-    class Config:
-        from_attributes = True
+    passengers: List[PassengerBrief]

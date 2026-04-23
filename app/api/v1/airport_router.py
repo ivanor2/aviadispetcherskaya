@@ -1,6 +1,6 @@
  # app/api/v1/airport_router.py
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlmodel import Session, select
 
 from app.models.airport import Airport
@@ -16,18 +16,21 @@ from app.controllers.airport_controller import (
 )
 from app.core.security import admin_required, get_current_user, dispatcher_or_higher
 from typing import List
-from fastapi_pagination import Page
+from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlmodel import paginate
 
 router = APIRouter(prefix="/airports", tags=["Аэропорты"])
 
 # Вместо get_airports_list:
+
 @router.get("", response_model=Page[AirportResponse])
 def get_airports_paginated(
     session: Session = Depends(get_session),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=1000)  # ✅ Увеличен лимит до 1000
 ):
-    return paginate(session, select(Airport))
+    return paginate(session, select(Airport), Params(page=page, size=size))
 
 @router.get("/{airport_id}", response_model=AirportResponse)
 def get_airport_by_id_endpoint(airport_id: int, session: Session = Depends(get_session),
