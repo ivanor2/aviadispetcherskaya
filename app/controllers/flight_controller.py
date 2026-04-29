@@ -1,5 +1,7 @@
 from sqlmodel import Session, select, delete
 from fastapi import HTTPException, status
+
+from app.models.airline import Airline
 from app.models.booking import Booking
 from app.models.flight import Flight
 from app.models.airport import Airport
@@ -9,26 +11,69 @@ from typing import List, Optional
 
 
 def create_flight(data: FlightCreate, session: Session) -> Flight:
-    # ✅ Проверка авиакомпании
-    airline = session.exec(select(Airline).where(Airline.code == data.airlineCode)).first()
+    """
+    Создание нового авиарейса с полной валидацией.
+    """
+    airline = session.exec(
+        select(Airline).where(Airline.code == data.airlineCode.upper())
+    ).first()
     if not airline:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Авиакомпания с таким кодом не зарегистрирована в системе")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Авиакомпания с кодом {data.airlineCode} не зарегистрирована в системе"
+        )
+    dep_airport = session.exec(
+        select(Airport).where(Airport.icao_code == data.departureAirportIcao.upper())
+    ).first()
 
-    # ... остальная логика проверки аэропортов и уникальности номера рейса ...
-    # Замените airline_name=data.airlineName на airline_code=data.airlineCode в Flight(...)
+    if not dep_airport:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Аэропорт отправления с ICAO-кодом {data.departureAirportIcao} не найден"
+        )
+    arr_airport = session.exec(
+        select(Airport).where(Airport.icao_code == data.arrivalAirportIcao.upper())
+    ).first()
+
+    if not arr_airport:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Аэропорт прибытия с ICAO-кодом {data.arrivalAirportIcao} не найден"
+        )
+    if dep_airport.icao_code == arr_airport.icao_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Аэропорты отправления и прибытия не могут совпадать"
+        )
+    flight_prefix = data.flightNumber.split('-')[0].upper()
+    if flight_prefix != data.airlineCode.upper():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Префикс номера рейса ({flight_prefix}) должен совпадать с кодом авиакомпании ({data.airlineCode})"
+        )
+    existing_flight = session.exec(
+        select(Flight).where(Flight.flight_number == data.flightNumber.upper())
+    ).first()
+    if existing_flight:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Рейс с таким номером уже существует"
+        )
     flight = Flight(
-        flight_number=data.flightNumber,
-        airline_code=data.airlineCode, # ✅ Обновлено
-        departure_airport_icao=data.departureAirportIcao.upper(),
-        arrival_airport_icao=data.arrivalAirportIcao.upper(),
+        flight_number=data.flightNumber.upper(),
+        airline_code=data.airlineCode.upper(),
+        departure_airport_icao=dep_airport.icao_code,
+        arrival_airport_icao=arr_airport.icao_code,
         departure_date=data.departureDate,
         departure_time=data.departureTime,
         total_seats=data.totalSeats,
-        free_seats=data.freeSeats
+        free_seats=data.freeSeats if data.freeSeats is not None else data.totalSeats
     )
+
     session.add(flight)
     session.commit()
     session.refresh(flight)
+
     return flight
 
 
@@ -67,7 +112,7 @@ def update_flight(flight_id: int, data: FlightUpdate, session: Session) -> Fligh
         else:
             snake_case_update_data[snake_key] = value
 
-    # ✅ Валидация новых аэропортов при изменении
+    #  Валидация новых аэропортов при изменении
     if 'departure_airport_icao' in snake_case_update_data:
         dep = session.exec(
             select(Airport).where(Airport.icao_code == snake_case_update_data['departure_airport_icao'])).first()

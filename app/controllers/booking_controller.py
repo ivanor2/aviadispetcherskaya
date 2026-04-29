@@ -8,61 +8,111 @@ from typing import List
 from app.schemas.booking_schema import BookingCreate # <-- Импортируем схему
 
 
-def sell_ticket(data: BookingCreate, session: Session) -> Booking: # <-- Принимаем BookingCreate
-    """Продажа билета"""
-    flight = session.get(Flight, data.flightId) # <-- Используем data.flightId
+def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
+    p_count = len(data.passengerIds)
+
+    # 1. Проверка основного рейса и мест
+    flight = session.get(Flight, data.flightId)
     if not flight:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Рейс не найден"
-        )
+        raise HTTPException(status_code=404, detail="Основной рейс не найден")
+    if flight.free_seats < p_count:
+        raise HTTPException(status_code=400, detail="Недостаточно мест на основном рейсе")
 
-    if flight.free_seats <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Нет свободных мест"
-        )
+    # 2. Проверка пассажиров
+    passengers = session.exec(select(Passenger).where(Passenger.id.in_(data.passengerIds))).all()
+    if len(passengers) != p_count:
+        raise HTTPException(status_code=400, detail="Один или несколько пассажиров не найдены")
 
-    passenger = session.get(Passenger, data.passengerId) # <-- Используем data.passengerId
-    if not passenger:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-             detail="Пассажир не найден"
-        )
+    # 3. Проверка дубликатов на основной рейс
+    existing = session.exec(select(Booking).where(
+        Booking.flight_id == data.flightId,
+        Booking.passenger_id.in_(data.passengerIds)
+    )).all()
+    if existing:
+        raise HTTPException(status_code=400, detail="Билет уже куплен для одного из пассажиров на этот рейс")
 
-    # Проверка на дубликат бронирования
-    existing_booking = session.exec(
-        select(Booking).where(
-            Booking.flight_id == data.flightId, # <-- Используем data.flightId
-            Booking.passenger_id == data.passengerId # <-- Используем data.passengerId
-        )
-    ).first()
+    booking_code = data.bookingCode or generate_booking_code()
 
-    if existing_booking:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Билет уже куплен"
-        )
+    # 4. Проверка рейсов пересадки
+    connection_flights = []
+    if data.connectionFlightIds:
+        for fid in data.connectionFlightIds:
+            cf = session.get(Flight, fid)
+            if not cf:
+                raise HTTPException(status_code=404, detail=f"Рейс пересадки {fid} не найден")
+            if cf.free_seats < p_count:
+                raise HTTPException(status_code=400, detail=f"Недостаточно мест на рейсе пересадки {cf.flight_number}")
 
-    # --- ОПРЕДЕЛЕНИЕ booking_code ---
-    booking_code_to_use = data.bookingCode # <-- Извлекаем bookingCode из данных
-    if booking_code_to_use is None:
-        booking_code_to_use = generate_booking_code() # <-- Генерируем, если не задан
-    # --- /ОПРЕДЕЛЕНИЕ booking_code ---
+            dup_cf = session.exec(select(Booking).where(
+                Booking.flight_id == fid,
+                Booking.passenger_id.in_(data.passengerIds)
+            )).all()
+            if dup_cf:
+                raise HTTPException(status_code=400, detail=f"Пассажир уже имеет билет на рейс {cf.flight_number}")
+            connection_flights.append(cf)
 
-    booking = Booking(
-        booking_code=booking_code_to_use, # <-- Используем выбранный код
-        flight_id=data.flightId, # <-- Используем data.flightId
-        passenger_id=data.passengerId # <-- Используем data.passengerId
-    )
+    try:
+        created_bookings = []
+        for p_id in data.passengerIds:
+            created_bookings.append(Booking(booking_code=booking_code, flight_id=data.flightId, passenger_id=p_id))
+            for cf in connection_flights:
+                created_bookings.append(Booking(booking_code=booking_code, flight_id=cf.id, passenger_id=p_id))
 
-    flight.free_seats -= 1
-    session.add(booking)
-    session.add(flight)
-    session.commit()
-    session.refresh(booking)
+        # Списание мест
+        flight.free_seats -= p_count
+        session.add(flight)
+        for cf in connection_flights:
+            cf.free_seats -= p_count
+            session.add(cf)
 
-    return booking
+        session.add_all(created_bookings)
+        session.commit()
+        for b in created_bookings:
+            session.refresh(b)
+        return created_bookings
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка при создании бронирования: {str(e)}")
+
+
+def add_connections_to_booking(booking_code: str, flight_ids: List[int], session: Session) -> List[Booking]:
+    existing = session.exec(select(Booking).where(Booking.booking_code == booking_code)).all()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Бронирование не найдено")
+
+    passenger_ids = list(set(b.passenger_id for b in existing))
+    p_count = len(passenger_ids)
+
+    try:
+        new_bookings = []
+        for fid in flight_ids:
+            flight = session.get(Flight, fid)
+            if not flight:
+                raise HTTPException(status_code=404, detail=f"Рейс {fid} не найден")
+            if flight.free_seats < p_count:
+                raise HTTPException(status_code=400, detail=f"Недостаточно мест на рейсе {flight.flight_number}")
+
+            dup = session.exec(select(Booking).where(
+                Booking.flight_id == fid,
+                Booking.passenger_id.in_(passenger_ids)
+            )).all()
+            if dup:
+                raise HTTPException(status_code=400, detail="Один из пассажиров уже имеет билет на этот рейс")
+
+            for p_id in passenger_ids:
+                new_bookings.append(Booking(booking_code=booking_code, flight_id=fid, passenger_id=p_id))
+
+            flight.free_seats -= p_count
+            session.add(flight)
+
+        session.add_all(new_bookings)
+        session.commit()
+        for b in new_bookings:
+            session.refresh(b)
+        return new_bookings
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- (остальные функции остаются без изменений) ---

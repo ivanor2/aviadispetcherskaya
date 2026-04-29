@@ -4,7 +4,7 @@ from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from sqlmodel import Session, select
 from app.db.session import get_session
-from app.schemas.booking_schema import BookingCreate, BookingResponse
+from app.schemas.booking_schema import BookingCreate, BookingResponse, ConnectionAddPayload
 from app.controllers.booking_controller import *
 from app.core.security import get_current_user, admin_required, dispatcher_or_higher
 from typing import List
@@ -12,16 +12,15 @@ from typing import List
 router = APIRouter(prefix="/bookings", tags=["Бронирование"])
 
 
-@router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-def sell_ticket_endpoint(
-    data: BookingCreate,
-    session: Session = Depends(get_session),
-    current_user = Depends(dispatcher_or_higher) # Аутентификация требуется
-):
-    """Продажа билета"""
-    booking = sell_ticket(data, session)
-    return BookingResponse.model_validate(booking, from_attributes=True)
+@router.post("/", response_model=List[BookingResponse], status_code=status.HTTP_201_CREATED)
+def sell_ticket_endpoint(data: BookingCreate, session: Session = Depends(get_session), current_user=Depends(dispatcher_or_higher)):
+    bookings = sell_ticket(data, session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
 
+@router.post("/{booking_code}/connections", response_model=List[BookingResponse], status_code=status.HTTP_201_CREATED)
+def add_connections_endpoint(booking_code: str, data: ConnectionAddPayload, session: Session = Depends(get_session), current_user=Depends(dispatcher_or_higher)):
+    bookings = add_connections_to_booking(booking_code, data.flightIds, session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
 
 
 @router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
