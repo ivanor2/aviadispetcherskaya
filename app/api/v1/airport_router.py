@@ -19,7 +19,7 @@ from typing import List
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlmodel import paginate
 
-router = APIRouter(prefix="/airports", tags=["Аэропорты"])
+router = APIRouter(prefix="", tags=["Аэропорты"])
 
 # Вместо get_airports_list:
 

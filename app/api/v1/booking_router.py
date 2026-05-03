@@ -9,7 +9,7 @@ from app.controllers.booking_controller import *
 from app.core.security import get_current_user, admin_required, dispatcher_or_higher
 from typing import List
 
-router = APIRouter(prefix="/bookings", tags=["Бронирование"])
+router = APIRouter(prefix="", tags=["Бронирование"])
 
 
 @router.post("/", response_model=List[BookingResponse], status_code=status.HTTP_201_CREATED)

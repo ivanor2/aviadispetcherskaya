@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Response
 from sqlmodel import Session, select
 from app.db.session import get_session
-from app.schemas.flight_schema import FlightCreate, FlightUpdate, FlightResponse, FlightWithPassengersResponse, PassengerBrief
+from app.schemas.flight_schema import FlightCreate, FlightUpdate, FlightResponse, FlightWithPassengersResponse, \
+    PassengerBrief, BookingPassengerResponse
 from app.models.flight import Flight
 from app.controllers.flight_controller import (
     create_flight, get_flight_by_id, get_flight_by_number,
@@ -13,7 +14,7 @@ from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from typing import List
 
-router = APIRouter(prefix="/flights", tags=["Авиарейсы"])
+router = APIRouter(prefix="", tags=["Авиарейсы"])
 
 @router.post("", response_model=FlightResponse, status_code=status.HTTP_201_CREATED)
 def create_flight_endpoint(
@@ -53,15 +54,19 @@ def search_flights_by_arrival_endpoint(airport_query: str, session: Session = De
     flights = search_flights_by_arrival(airport_query, session)
     return [FlightResponse.model_validate(f, from_attributes=True) for f in flights]
 
+
 @router.get("/by-number/{flight_number}", response_model=FlightWithPassengersResponse)
 def get_flight_by_number_with_passengers_endpoint(
-    flight_number: str,
-    session: Session = Depends(get_session),
-    current_user = Depends(dispatcher_or_higher)
+        flight_number: str,
+        session: Session = Depends(get_session),
+        current_user=Depends(dispatcher_or_higher)
 ):
-    flight, passengers = get_flight_with_passengers_by_number(flight_number, session)
+    flight, bookings_data = get_flight_with_passengers_by_number(flight_number, session)
     flight_response = FlightResponse.model_validate(flight, from_attributes=True)
-    passengers_list = [PassengerBrief.model_validate(p, from_attributes=True) for p in passengers]
+
+    # Преобразуем список словарей в Pydantic-модели
+    passengers_list = [BookingPassengerResponse.model_validate(b, from_attributes=True) for b in bookings_data]
+
     return FlightWithPassengersResponse(flight=flight_response, passengers=passengers_list)
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_required)])

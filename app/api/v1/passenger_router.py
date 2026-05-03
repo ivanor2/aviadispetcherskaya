@@ -22,7 +22,7 @@ from app.core.security import get_current_user, admin_required, dispatcher_or_hi
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 
-router = APIRouter(prefix="/passengers", tags=["Пассажиры"])
+router = APIRouter(prefix="", tags=["Пассажиры"])
 
 
 @router.post("", response_model=PassengerResponse, status_code=status.HTTP_201_CREATED)

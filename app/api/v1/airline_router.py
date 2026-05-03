@@ -6,7 +6,7 @@ import app.controllers.airline_controller as ctrl
 from app.core.security import admin_required, get_current_user
 from typing import List
 
-router = APIRouter(prefix="/airlines", tags=["Авиакомпании"])
+router = APIRouter(prefix="", tags=["Авиакомпании"])
 
 @router.get("", response_model=List[AirlineResponse])
 def list_airlines(session: Session = Depends(get_session), _=Depends(get_current_user)):

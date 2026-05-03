@@ -135,6 +135,7 @@ def cancel_ticket(booking_id: int, session: Session):
     session.commit()
 
 
+
 def get_bookings_by_flight(flight_id: int, session: Session) -> List[Booking]:
     """Получение бронирований по рейсу"""
     return session.exec(
@@ -154,3 +155,4 @@ def get_bookings_by_passenger(passport: str, session: Session) -> List[Booking]:
     return session.exec(
         select(Booking).where(Booking.passenger_id == passenger.id)
     ).all()
+

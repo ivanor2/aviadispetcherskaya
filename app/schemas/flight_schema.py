@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from datetime import date, time
+from datetime import date, time, datetime
 from typing import Optional, List
 import re
 
@@ -56,14 +56,19 @@ class FlightResponse(BaseModel):
 
 
 class PassengerBrief(BaseModel):
-    id: int
-    fullName: str = Field(alias="full_name")
-    passportNumber: str = Field(alias="passport_number")
-    birthDate: date = Field(alias="birth_date")
-
+    full_name: str = Field(alias="full_name")
+    passport_number: str = Field(alias="passport_number")
     model_config = ConfigDict(from_attributes=True)
 
+class BookingPassengerResponse(BaseModel):
+    id: int
+    booking_code: str = Field(alias="booking_code")
+    booked_at: datetime = Field(alias="booked_at")
+    passenger: PassengerBrief
+    model_config = ConfigDict(from_attributes=True)
 
 class FlightWithPassengersResponse(BaseModel):
     flight: FlightResponse
-    passengers: List[PassengerBrief]
+    passengers: List[BookingPassengerResponse]
+    model_config = ConfigDict(from_attributes=True)
+

@@ -17,7 +17,7 @@ import os
 
 load_dotenv()
 
-router = APIRouter(prefix="/auth", tags=["Аутентификация"])
+router = APIRouter(prefix="", tags=["Аутентификация"])
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
@@ -40,7 +40,6 @@ async def login(
     # Аутентификация по username и password
     tokens = authenticate_user(data.username, data.password, session)
 
-    # Установка access_token в HttpOnly cookie с правильными параметрами
     response.set_cookie(
         key="access_token",
         value=tokens["access_token"],

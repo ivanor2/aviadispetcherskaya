@@ -170,11 +170,19 @@ def get_flight_with_passengers_by_number(flight_number: str, session: Session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
 
     bookings = session.exec(select(Booking).where(Booking.flight_id == flight.id)).all()
-    passenger_ids = [b.passenger_id for b in bookings]
-    passengers = []
-    if passenger_ids:
-        passengers = session.exec(select(Passenger).where(Passenger.id.in_(passenger_ids))).all()
-    return flight, passengers
+    result = []
+    for b in bookings:
+        p = session.get(Passenger, b.passenger_id)
+        result.append({
+            "id": b.id,
+            "booking_code": b.booking_code,
+            "booked_at": b.created_at.isoformat() if b.created_at else None,
+            "passenger": {
+                "full_name": p.full_name if p else "Пассажир удалён",
+                "passport_number": p.passport_number if p else "N/A"
+            }
+        })
+    return flight, result
 
 
 def delete_all_flights(session: Session):

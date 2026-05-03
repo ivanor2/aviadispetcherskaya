@@ -106,4 +106,6 @@ def update_passenger(passenger_id: int, data: PassengerUpdate, session: Session)
     session.commit()
     session.refresh(passenger)
     return passenger
-# ... (существующая функция delete_passenger)
+
+
+
