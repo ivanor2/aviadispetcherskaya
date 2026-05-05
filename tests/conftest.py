@@ -1,24 +1,31 @@
+# tests/conftest.py
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
-from app.main import app_v1
+from sqlmodel import Session, SQLModel, select
+from app.db.database import engine, init_db
 from app.db.session import get_session
+from app.main import app
 from app.models.user import User
-from app.db.database import engine
+from app.core.security import hash_password, create_access_token
 from faker import Faker
 
 fake = Faker()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_db():
+    """Инициализация БД перед всеми тестами"""
+    init_db()
+    yield
+    # Очистка после тестов (опционально)
+    SQLModel.metadata.drop_all(engine)
+
+
 @pytest.fixture(scope="function")
-def session():
-    """
-    Создает одну базу данных для тестовой функции,
-    оборачивает все в транзакцию, которая откатывается в конце.
-    """
+def db_session():
+    """Фикстура сессии БД с откатом транзакции после теста"""
     connection = engine.connect()
     transaction = connection.begin()
-
     session = Session(bind=connection)
 
     yield session
@@ -29,109 +36,61 @@ def session():
 
 
 @pytest.fixture(scope="function")
-def client(session):
-    """
-    TestClient, который использует ОБЩИЙ фикстуру session.
-    """
+def client(db_session):
+    """TestClient с переопределённой зависимостью get_session"""
 
     def override_get_session():
-        yield session
+        yield db_session
 
-    app_v1.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_session] = override_get_session
 
-    with TestClient(app_v1) as c:
-        yield c
+    with TestClient(app) as test_client:
+        yield test_client
 
-    app_v1.dependency_overrides.clear()
-
-
-# --- Data Fixtures ---
-@pytest.fixture
-def admin_user_data():
-    suffix = fake.numerify("####")
-    return {"username": f"admin_test_{suffix}", "password": "StrongP@ssw0rd!"}
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def regular_user_data():
-    suffix = fake.numerify("####")
-    return {"username": f"user_test_{suffix}", "password": "RegularP@ssw0rd!"}
+def admin_token(db_session):
+    """Токен администратора - ИСПРАВЛЕНО: сохраняем username ДО закрытия сессии"""
+    username = f"test_admin_{fake.numerify('####')}"
+    password = hash_password("Admin123!")
+
+    user = User(username=username, password=password, role="admin")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)  # Гарантируем, что все атрибуты загружены
+
+    # ✅ КЛЮЧЕВОЕ: сохраняем username в строку ДО выхода из сессии
+    token = create_access_token({"sub": user.username})
+    return token
 
 
 @pytest.fixture
-def sample_airport_data():
-    # Используем валидный префикс "UK" и алфавитный суффикс
-    icao = "UK" + fake.lexify("??", letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-    return {"icaoCode": icao, "name": fake.city() + " Test Airport"}
+def guest_token(db_session):
+    """Токен гостя - ИСПРАВЛЕНО"""
+    username = f"test_guest_{fake.numerify('####')}"
+    password = hash_password("Guest123!")
+
+    user = User(username=username, password=password, role="guest")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    token = create_access_token({"sub": user.username})
+    return token
 
 
 @pytest.fixture
-def sample_passenger_data():
-    return {
-        "passportNumber": fake.numerify("####-######"),
-        "passportIssuedBy": fake.city() + " УФМС",
-        "passportIssueDate": fake.date_between(start_date="-10y", end_date="-1y").isoformat(),
-        "fullName": fake.name(),
-        "birthDate": fake.date_of_birth(minimum_age=18, maximum_age=90).isoformat(),
-    }
+def dispatcher_token(db_session):
+    """Токен диспетчера"""
+    username = f"test_dispatch_{fake.numerify('####')}"
+    password = hash_password("Dispatch123!")
 
+    user = User(username=username, password=password, role="dispatcher")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
 
-@pytest.fixture
-def sample_flight_data():
-    return {
-        "flightNumber": fake.lexify("??", letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ") + "-" + fake.numerify("###"),
-        "airlineName": fake.company() + " Airlines",
-        "departureDate": fake.date_between(start_date="today", end_date="+30d").isoformat(),
-        "departureTime": "12:00:00",
-        "totalSeats": 150,
-        "freeSeats": 150,
-        # departureAirportId / arrivalAirportId are filled in the test
-    }
-
-
-# --- Auth Helpers ---
-def register_and_login_user(client, username: str, password: str, role: str = "guest") -> str:
-    """Регистрирует пользователя и возвращает access_token, используя общую сессию."""
-    # 1. Регистрация
-    reg = client.post("/auth/register", json={"username": username, "password": password})
-    assert reg.status_code == 201, f"Reg failed: {reg.text}"
-    user_id = reg.json()["id"]
-
-    # 2. Повышение роли, если нужно
-    if role != "guest":
-        session_gen = client.app.dependency_overrides[get_session]()
-        session = next(session_gen)
-
-        user = session.get(User, user_id)
-        assert user, "User not found after register"
-        user.role = role
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-    # 3. Логин
-    login = client.post("/auth/login", json={"username": username, "password": password})
-    assert login.status_code == 200, f"Login failed: {login.text}"
-    return login.json()["access_token"]
-
-
-@pytest.fixture
-def admin_headers(client, admin_user_data):
-    token = register_and_login_user(
-        client,
-        admin_user_data["username"],
-        admin_user_data["password"],
-        role="admin"
-    )
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
-def regular_user_headers(client, regular_user_data):
-    token = register_and_login_user(
-        client,
-        regular_user_data["username"],
-        regular_user_data["password"],
-        role="guest"
-    )
-    return {"Authorization": f"Bearer {token}"}
+    token = create_access_token({"sub": user.username})
+    return token
