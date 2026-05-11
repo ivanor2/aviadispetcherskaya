@@ -1,0 +1,11 @@
+[run]
+source = app
+omit =
+    app/utils/populate_db.py
+    app/db/database.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__.:
