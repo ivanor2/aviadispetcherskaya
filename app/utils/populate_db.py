@@ -178,7 +178,10 @@ def populate_database(
         # Ограничиваем кол-во бронирований реальным количеством свободных мест
         total_free_seats = sum(f.free_seats for f in flights)
         target_bookings = min(count_bookings, total_free_seats)
-
+        
+        # Варианты для генерации данных
+        payment_types = ["card", "cash", "online"]
+        
         for _ in range(target_bookings):
             eligible_flights = [f for f in flights if f.free_seats > 0]
             if not eligible_flights:
@@ -202,12 +205,24 @@ def populate_database(
             while code in used_codes:
                 code = generate_booking_code()
             used_codes.add(code)
+            
+            # Генерируем случайные значения для новых полей
+            baggage = random.choice([True, False])
+            payment = random.choice(payment_types)
+            base_price = round(random.uniform(5000, 50000), 2)  # Базовая цена от 5000 до 50000
+            tax = round(base_price * 0.1, 2)  # Налог 10% от базовой цены
+            additional_fees = round(random.uniform(0, 5000), 2)  # Доп сборы от 0 до 5000
 
             bookings.append(Booking(
                 booking_code=code,
                 flight_id=flight.id,
                 passenger_id=passenger.id,
-                created_at=datetime.utcnow() - timedelta(days=random.randint(0, 7))
+                created_at=datetime.utcnow() - timedelta(days=random.randint(0, 7)),
+                baggage_allowed=baggage,
+                payment_type=payment,
+                base_price=base_price,
+                tax=tax,
+                additional_fees=additional_fees
             ))
             flight.free_seats -= 1
             session.add(flight)

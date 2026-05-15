@@ -7,6 +7,11 @@ class BookingCreate(BaseModel):
     passengerIds: List[int] = Field(..., min_length=1, description="ID пассажиров для группового бронирования")
     connectionFlightIds: Optional[List[int]] = Field(default=None, description="ID рейсов для пересадок")
     bookingCode: Optional[str] = Field(None)
+    baggageAllowed: bool = Field(default=False, description="Возможность багажа")
+    paymentType: str = Field(default="card", description="Тип оплаты: card, cash, online")
+    basePrice: float = Field(default=0.0, description="Базовая цена")
+    tax: float = Field(default=0.0, description="Налог")
+    additionalFees: float = Field(default=0.0, description="Дополнительные сборы")
 
 class BookingResponse(BaseModel):
     id: int
@@ -14,6 +19,12 @@ class BookingResponse(BaseModel):
     flightId: int = Field(alias="flight_id")
     passengerId: int = Field(alias="passenger_id")
     createdAt: datetime = Field(alias="created_at")
+    baggageAllowed: bool = Field(default=False, alias="baggage_allowed")
+    paymentType: str = Field(default="card", alias="payment_type")
+    basePrice: float = Field(default=0.0, alias="base_price")
+    tax: float = Field(default=0.0, alias="tax")
+    additionalFees: float = Field(default=0.0, alias="additional_fees")
+    finalPrice: float = Field(description="Финальная цена")
 
     class Config:
         from_attributes = True
