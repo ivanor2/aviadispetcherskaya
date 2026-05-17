@@ -62,3 +62,6 @@ def test_role_based_access(client, guest_token):
     # Гость не должен создавать аэропорты
     res = client.post("/api/v1/airports", json={"icaoCode": "UUWW", "name": "Test"}, headers=headers)
     assert res.status_code == status.HTTP_403_FORBIDDEN
+
+def test():
+    pass
