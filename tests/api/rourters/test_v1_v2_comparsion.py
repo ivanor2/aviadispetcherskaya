@@ -1,8 +1,20 @@
+"""Тесты сравнения версий API v1 и v2.
+
+Проверяют различия в структуре ответов и функциональности между версиями API.
+"""
 import pytest
 
 
 class TestV1VsV2Comparison:
+    """Набор тестов для сравнения функциональности API v1 и v2."""
+
     def test_list_structure_difference(self, client, admin_token, fake_airport_data):
+        """Тестирует различия в структуре ответов между v1 и v2.
+        
+        Проверяет:
+        - V1 возвращает Page[AirportResponse] (fastapi-pagination)
+        - V2 возвращает Page с поиском и сортировкой, содержит items и total
+        """
         headers = {"Authorization": f"Bearer {admin_token}"}
         client.post("/api/v2/airports", json=fake_airport_data, headers=headers)
 
@@ -17,6 +29,10 @@ class TestV1VsV2Comparison:
         assert "items" in data and "total" in data
 
     def test_search_feature_v2(self, client, admin_token, fake_airport_data):
+        """Тестирует функцию поиска, доступную только в API v2.
+        
+        Проверяет, что поиск по названию аэропорта возвращает результаты.
+        """
         headers = {"Authorization": f"Bearer {admin_token}"}
         client.post("/api/v2/airports", json=fake_airport_data, headers=headers)
 
@@ -25,6 +41,10 @@ class TestV1VsV2Comparison:
         assert len(res.json()["items"]) >= 1
 
     def test_sorting_v2(self, client, admin_token, fake_airport_data):
+        """Тестирует функцию сортировки, доступную только в API v2.
+        
+        Проверяет сортировку аэропортов по имени в убывающем порядке.
+        """
         headers = {"Authorization": f"Bearer {admin_token}"}
         for i in range(2):
             data = fake_airport_data.copy()

@@ -1,3 +1,8 @@
+"""Тесты расширенных функций API v2.
+
+Проверяют продвинутые возможности версии 2 API: поиск, сортировка,
+бронирование и отмена билетов.
+"""
 # tests/api/rourters/test_v2_features.py
 import pytest
 from fastapi import status
@@ -5,8 +10,16 @@ from fastapi import status
 
 @pytest.mark.usefixtures("db_session")
 class TestV2AdvancedFeatures:
+    """Набор тестов для проверки расширенных функций API v2."""
 
     def test_airport_search_and_sort(self, client, admin_token):
+        """Тестирует поиск и сортировку аэропортов в API v2.
+        
+        Проверяет:
+        - Создание двух аэропортов с валидными ICAO-кодами
+        - Сортировку по имени в возрастающем порядке
+        - Корректную структуру ответа с items
+        """
         headers = {"Authorization": f"Bearer {admin_token}"}
         # ✅ Используем только валидные ICAO-коды из VALID_ICAO_PREFIXES
         ap1 = {"icaoCode": "AGEE", "name": "Sheremetyevo Intl"}
@@ -25,6 +38,16 @@ class TestV2AdvancedFeatures:
         assert data["items"][0]["name"] == "Sheremetyevo Intl"
 
     def test_booking_sell_and_list(self, client, admin_token, fake_passenger_data):
+        """Тестирует продажу и отмену бронирования через API v2.
+        
+        Проверяет полный цикл:
+        - Создание авиакомпании
+        - Создание аэропортов вылета и прибытия
+        - Создание рейса
+        - Создание пассажира
+        - Продажа билета (201)
+        - Отмена бронирования (204)
+        """
         headers = {"Authorization": f"Bearer {admin_token}"}
 
         # 1. Создаем авиакомпанию

@@ -1,1 +1,38 @@
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Test coverage reports
+.coverage
+htmlcov/
+coverage/
+
+# Environment variables
 .env
+.env.local
+*.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# Dependency directories
+.venv/
+venv/
+node_modules/
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Cache directories
+.mypy_cache/
+.pytest_cache/
+.gradle/
