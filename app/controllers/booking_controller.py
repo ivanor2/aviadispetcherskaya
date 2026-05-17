@@ -54,9 +54,27 @@ def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
     try:
         created_bookings = []
         for p_id in data.passengerIds:
-            created_bookings.append(Booking(booking_code=booking_code, flight_id=data.flightId, passenger_id=p_id))
+            created_bookings.append(Booking(
+                booking_code=booking_code, 
+                flight_id=data.flightId, 
+                passenger_id=p_id,
+                baggage_allowed=data.baggageAllowed,
+                payment_type=data.paymentType,
+                base_price=data.basePrice,
+                tax=data.tax,
+                additional_fees=data.additionalFees
+            ))
             for cf in connection_flights:
-                created_bookings.append(Booking(booking_code=booking_code, flight_id=cf.id, passenger_id=p_id))
+                created_bookings.append(Booking(
+                    booking_code=booking_code, 
+                    flight_id=cf.id, 
+                    passenger_id=p_id,
+                    baggage_allowed=data.baggageAllowed,
+                    payment_type=data.paymentType,
+                    base_price=data.basePrice,
+                    tax=data.tax,
+                    additional_fees=data.additionalFees
+                ))
 
         # Списание мест
         flight.free_seats -= p_count
@@ -82,6 +100,14 @@ def add_connections_to_booking(booking_code: str, flight_ids: List[int], session
 
     passenger_ids = list(set(b.passenger_id for b in existing))
     p_count = len(passenger_ids)
+    
+    # Получаем параметры оплаты и багажа из существующего бронирования
+    first_booking = existing[0]
+    baggage_allowed = first_booking.baggage_allowed
+    payment_type = first_booking.payment_type
+    base_price = first_booking.base_price
+    tax = first_booking.tax
+    additional_fees = first_booking.additional_fees
 
     try:
         new_bookings = []
@@ -100,7 +126,16 @@ def add_connections_to_booking(booking_code: str, flight_ids: List[int], session
                 raise HTTPException(status_code=400, detail="Один из пассажиров уже имеет билет на этот рейс")
 
             for p_id in passenger_ids:
-                new_bookings.append(Booking(booking_code=booking_code, flight_id=fid, passenger_id=p_id))
+                new_bookings.append(Booking(
+                    booking_code=booking_code, 
+                    flight_id=fid, 
+                    passenger_id=p_id,
+                    baggage_allowed=baggage_allowed,
+                    payment_type=payment_type,
+                    base_price=base_price,
+                    tax=tax,
+                    additional_fees=additional_fees
+                ))
 
             flight.free_seats -= p_count
             session.add(flight)
