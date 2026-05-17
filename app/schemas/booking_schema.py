@@ -24,7 +24,7 @@ class BookingResponse(BaseModel):
     basePrice: float = Field(default=0.0, alias="base_price")
     tax: float = Field(default=0.0, alias="tax")
     additionalFees: float = Field(default=0.0, alias="additional_fees")
-    finalPrice: float = Field(description="Финальная цена")
+    finalPrice: float = Field(description="Финальная цена", alias="final_price")
 
     class Config:
         from_attributes = True
