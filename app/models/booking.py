@@ -16,6 +16,7 @@ class Booking(SQLModel, table=True):
     passenger_id: int = Field(
         sa_column=Column(Integer, ForeignKey("passenger.id", ondelete="CASCADE"))
     )
+    seat: str = Field(default="", description="Номер места пассажира")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Новые поля для управления багажом и ценой

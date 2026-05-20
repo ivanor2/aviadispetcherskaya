@@ -40,6 +40,8 @@ class TestBookingController:
         f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
         res = sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
         assert len(res) == 1
+        # Проверяем, что место назначено
+        assert res[0].seat is not None and res[0].seat != ""
 
     def test_sell_no_seats(self, db_session, fake_flight_data, fake_passenger_data):
         """Тестирует ошибку при продаже билета на рейс без мест.
@@ -62,6 +64,30 @@ class TestBookingController:
         with pytest.raises(HTTPException) as exc:
             sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
         assert "уже куплен" in exc.value.detail.lower()
+
+    def test_sell_with_custom_seats(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует продажу билетов с указанием конкретных мест."""
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        res = sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id], seats=["1A"]), db_session)
+        assert len(res) == 1
+        assert res[0].seat == "1A"
+
+    def test_sell_seat_occupied(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует ошибку при попытке занять уже занятое место."""
+        from app.controllers.passenger_controller import create_passenger
+        from app.schemas.passenger_schema import PassengerCreate
+        
+        f, p1 = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        # Бронируем место 1A для первого пассажира
+        sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p1.id], seats=["1A"]), db_session)
+        
+        # Создаем второго пассажира
+        p2 = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        
+        # Пытаемся забронировать то же место
+        with pytest.raises(HTTPException) as exc:
+            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p2.id], seats=["1A"]), db_session)
+        assert "уже занято" in exc.value.detail.lower()
 
     def test_cancel_success(self, db_session, fake_flight_data, fake_passenger_data):
         """Тестирует успешную отмену бронирования.

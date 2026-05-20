@@ -18,6 +18,26 @@ def list_flights(session: Session = Depends(get_session), _=Depends(get_current_
 
 @router.post("", response_model=FlightResponse, status_code=status.HTTP_201_CREATED)
 def create_flight(data: FlightCreate, session: Session = Depends(get_session), _=Depends(admin_required)):
+    # Проверяем существование зависимостей
+    from app.models.airline import Airline
+    from app.models.airport import Airport
+    from sqlmodel import select
+    
+    airline = session.exec(select(Airline).where(Airline.code == data.airlineCode.upper())).first()
+    if not airline:
+        raise HTTPException(status_code=400, detail="Авиакомпания не найдена")
+    
+    dep_airport = session.exec(select(Airport).where(Airport.icao_code == data.departureAirportIcao.upper())).first()
+    if not dep_airport:
+        raise HTTPException(status_code=400, detail="Аэропорт отправления не найден")
+    
+    arr_airport = session.exec(select(Airport).where(Airport.icao_code == data.arrivalAirportIcao.upper())).first()
+    if not arr_airport:
+        raise HTTPException(status_code=400, detail="Аэропорт прибытия не найден")
+    
+    if dep_airport.icao_code == arr_airport.icao_code:
+        raise HTTPException(status_code=400, detail="Аэропорты отправления и прибытия не могут совпадать")
+    
     flight = Flight(
         flight_number=data.flightNumber,
         airline_code=data.airlineCode,
@@ -27,7 +47,7 @@ def create_flight(data: FlightCreate, session: Session = Depends(get_session), _
         departure_time=data.departureTime,
         arrival_time=data.arrivalTime,
         total_seats=data.totalSeats,
-        free_seats=data.freeSeats
+        free_seats=data.totalSeats  # ✅ Всегда устанавливаем максимальное количество
     )
     session.add(flight)
     session.commit()

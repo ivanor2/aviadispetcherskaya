@@ -153,7 +153,8 @@ def populate_database(
             arr_airport = random.choice(eligible_arr) if eligible_arr else dep_airport
 
             total_seats = random.choice([120, 150, 180, 200, 220, 250])
-            free_seats = random.randint(0, total_seats)
+            # ✅ free_seets всегда равно total_seats при создании рейса
+            free_seats = total_seats
 
             # Генерируем время отправления и прибытия
             dep_time = time(random.randint(0, 23), random.choice([0, 15, 30, 45]))
@@ -226,11 +227,17 @@ def populate_database(
             tax = round(base_price * 0.1, 2)  # Налог 10% от базовой цены
             additional_fees = round(random.uniform(0, 5000), 2)  # Доп сборы от 0 до 5000
             class_type = random.choice(["economy", "business", "first"])
+            
+            # Генерируем номер места
+            row = random.randint(1, flight.total_seats // 6 + 1)
+            seat_letter = random.choice(['A', 'B', 'C', 'D', 'E', 'F'])
+            seat_num = f"{row}{seat_letter}"
 
             bookings.append(Booking(
                 booking_code=code,
                 flight_id=flight.id,
                 passenger_id=passenger.id,
+                seat=seat_num,
                 created_at=datetime.utcnow() - timedelta(days=random.randint(0, 7)),
                 baggage_allowed=baggage,
                 payment_type=payment,

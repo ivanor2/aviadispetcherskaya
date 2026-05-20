@@ -13,6 +13,7 @@ from typing import List, Optional
 def create_flight(data: FlightCreate, session: Session) -> Flight:
     """
     Создание нового авиарейса с полной валидацией.
+    При создании рейса free_seats автоматически устанавливается равным total_seats.
     """
     airline = session.exec(
         select(Airline).where(Airline.code == data.airlineCode.upper())
@@ -59,6 +60,7 @@ def create_flight(data: FlightCreate, session: Session) -> Flight:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Рейс с таким номером уже существует"
         )
+    # ✅ free_seats всегда равно total_seats при создании рейса
     flight = Flight(
         flight_number=data.flightNumber.upper(),
         airline_code=data.airlineCode.upper(),
@@ -68,7 +70,7 @@ def create_flight(data: FlightCreate, session: Session) -> Flight:
         departure_time=data.departureTime,
         arrival_time=data.arrivalTime,
         total_seats=data.totalSeats,
-        free_seats=data.freeSeats if data.freeSeats is not None else data.totalSeats
+        free_seats=data.totalSeats  # ✅ Игнорируем переданное значение, всегда ставим максимум
     )
 
     session.add(flight)
