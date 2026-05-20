@@ -155,13 +155,26 @@ def populate_database(
             total_seats = random.choice([120, 150, 180, 200, 220, 250])
             free_seats = random.randint(0, total_seats)
 
+            # Генерируем время отправления и прибытия
+            dep_time = time(random.randint(0, 23), random.choice([0, 15, 30, 45]))
+            
+            # Генерируем время прибытия (департура + случайное время полета от 1 до 12 часов)
+            flight_duration_hours = random.randint(1, 12)
+            flight_duration_minutes = random.choice([0, 15, 30, 45])
+            arrival_hour = (dep_time.hour + flight_duration_hours) % 24
+            arrival_minute = (dep_time.minute + flight_duration_minutes) % 60
+            if dep_time.minute + flight_duration_minutes >= 60:
+                arrival_hour = (arrival_hour + 1) % 24
+            arrival_t = time(arrival_hour, arrival_minute)
+
             flights.append(Flight(
                 flight_number=flight_num,
                 airline_code=airline.code,  # ✅ FK к Airline.code
                 departure_airport_icao=dep_airport.icao_code,  # ✅ FK к Airport.icao_code (ИСПРАВЛЕНО)
                 arrival_airport_icao=arr_airport.icao_code,  # ✅ FK к Airport.icao_code (ИСПРАВЛЕНО)
                 departure_date=base_date + timedelta(days=random.randint(1, 30)),
-                departure_time=time(random.randint(0, 23), random.choice([0, 15, 30, 45])),
+                departure_time=dep_time,
+                arrival_time=arrival_t,
                 total_seats=total_seats,
                 free_seats=free_seats
             ))
@@ -212,6 +225,7 @@ def populate_database(
             base_price = round(random.uniform(5000, 50000), 2)  # Базовая цена от 5000 до 50000
             tax = round(base_price * 0.1, 2)  # Налог 10% от базовой цены
             additional_fees = round(random.uniform(0, 5000), 2)  # Доп сборы от 0 до 5000
+            class_type = random.choice(["economy", "business", "first"])
 
             bookings.append(Booking(
                 booking_code=code,
@@ -222,7 +236,8 @@ def populate_database(
                 payment_type=payment,
                 base_price=base_price,
                 tax=tax,
-                additional_fees=additional_fees
+                additional_fees=additional_fees,
+                class_type=class_type
             ))
             flight.free_seats -= 1
             session.add(flight)

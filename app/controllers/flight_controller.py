@@ -66,6 +66,7 @@ def create_flight(data: FlightCreate, session: Session) -> Flight:
         arrival_airport_icao=arr_airport.icao_code,
         departure_date=data.departureDate,
         departure_time=data.departureTime,
+        arrival_time=data.arrivalTime,
         total_seats=data.totalSeats,
         free_seats=data.freeSeats if data.freeSeats is not None else data.totalSeats
     )

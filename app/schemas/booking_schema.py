@@ -12,6 +12,7 @@ class BookingCreate(BaseModel):
     basePrice: float = Field(default=0.0, description="Базовая цена")
     tax: float = Field(default=0.0, description="Налог")
     additionalFees: float = Field(default=0.0, description="Дополнительные сборы")
+    classType: str = Field(default="economy", description="Класс обслуживания: economy, business, first")
 
 class BookingResponse(BaseModel):
     id: int
@@ -24,6 +25,7 @@ class BookingResponse(BaseModel):
     basePrice: float = Field(default=0.0, alias="base_price")
     tax: float = Field(default=0.0, alias="tax")
     additionalFees: float = Field(default=0.0, alias="additional_fees")
+    classType: str = Field(default="economy", alias="class_type", description="Класс обслуживания")
     finalPrice: float = Field(description="Финальная цена", alias="final_price")
 
     class Config:

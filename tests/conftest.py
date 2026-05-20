@@ -280,8 +280,11 @@ def fake_flight_data(db_session, fake_airline_data, fake_airport_data):
         "airlineCode": fake_airline_data["code"],
         "departureAirportIcao": fake_airport_data["icaoCode"],
         "arrivalAirportIcao": arr_icao,
-        "departureDate": "2026-12-12", "departureTime": "10:00:00",
-        "totalSeats": 150, "freeSeats": 50
+        "departureDate": "2026-12-12", 
+        "departureTime": "10:00:00",
+        "arrivalTime": "14:00:00",
+        "totalSeats": 150, 
+        "freeSeats": 50
     }
 
 

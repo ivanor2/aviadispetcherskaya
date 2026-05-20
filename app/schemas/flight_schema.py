@@ -10,6 +10,7 @@ class FlightCreate(BaseModel):
     arrivalAirportIcao: str = Field(..., max_length=4)
     departureDate: date
     departureTime: time
+    arrivalTime: time
     totalSeats: int = Field(..., gt=0)
     freeSeats: int = Field(..., ge=0)
 
@@ -39,6 +40,7 @@ class FlightUpdate(BaseModel):
     arrivalAirportIcao: Optional[str] = None
     departureDate: Optional[date] = None
     departureTime: Optional[time] = None
+    arrivalTime: Optional[time] = None
     totalSeats: Optional[int] = None
     freeSeats: Optional[int] = None
 
@@ -50,6 +52,7 @@ class FlightResponse(BaseModel):
     arrivalAirportIcao: str = Field(alias="arrival_airport_icao")
     departureDate: date = Field(alias="departure_date")
     departureTime: time = Field(alias="departure_time")
+    arrivalTime: time = Field(alias="arrival_time")
     totalSeats: int = Field(alias="total_seats")
     freeSeats: int = Field(alias="free_seats")
     model_config = {"from_attributes": True, "populate_by_name": True}

@@ -45,7 +45,17 @@ def create_bookings(
     code = data.bookingCode or generate_booking_code()
 
     for p_id in data.passengerIds:
-        booking = Booking(flight_id=flight.id, passenger_id=p_id, booking_code=code)
+        booking = Booking(
+            flight_id=flight.id, 
+            passenger_id=p_id, 
+            booking_code=code,
+            baggage_allowed=data.baggageAllowed,
+            payment_type=data.paymentType,
+            base_price=data.basePrice,
+            tax=data.tax,
+            additional_fees=data.additionalFees,
+            class_type=data.classType
+        )
         session.add(booking)
         results.append(booking)
 
