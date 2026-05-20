@@ -62,7 +62,8 @@ def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
                 payment_type=data.paymentType,
                 base_price=data.basePrice,
                 tax=data.tax,
-                additional_fees=data.additionalFees
+                additional_fees=data.additionalFees,
+                class_type=data.classType
             ))
             for cf in connection_flights:
                 created_bookings.append(Booking(
@@ -73,7 +74,8 @@ def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
                     payment_type=data.paymentType,
                     base_price=data.basePrice,
                     tax=data.tax,
-                    additional_fees=data.additionalFees
+                    additional_fees=data.additionalFees,
+                    class_type=data.classType
                 ))
 
         # Списание мест
@@ -108,6 +110,7 @@ def add_connections_to_booking(booking_code: str, flight_ids: List[int], session
     base_price = first_booking.base_price
     tax = first_booking.tax
     additional_fees = first_booking.additional_fees
+    class_type = first_booking.class_type
 
     try:
         new_bookings = []
@@ -134,7 +137,8 @@ def add_connections_to_booking(booking_code: str, flight_ids: List[int], session
                     payment_type=payment_type,
                     base_price=base_price,
                     tax=tax,
-                    additional_fees=additional_fees
+                    additional_fees=additional_fees,
+                    class_type=class_type
                 ))
 
             flight.free_seats -= p_count

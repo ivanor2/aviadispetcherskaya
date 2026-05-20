@@ -14,5 +14,6 @@ class Flight(SQLModel, table=True):
     arrival_airport_icao: str = Field(foreign_key="airport.icao_code", max_length=4)
     departure_date: date
     departure_time: time
+    arrival_time: time
     total_seats: int
     free_seats: int

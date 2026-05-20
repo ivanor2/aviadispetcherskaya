@@ -25,6 +25,7 @@ def create_flight(data: FlightCreate, session: Session = Depends(get_session), _
         arrival_airport_icao=data.arrivalAirportIcao,
         departure_date=data.departureDate,
         departure_time=data.departureTime,
+        arrival_time=data.arrivalTime,
         total_seats=data.totalSeats,
         free_seats=data.freeSeats
     )
