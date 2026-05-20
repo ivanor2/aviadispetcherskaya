@@ -12,7 +12,6 @@ class FlightCreate(BaseModel):
     departureTime: time
     arrivalTime: time
     totalSeats: int = Field(..., gt=0)
-    freeSeats: int = Field(..., ge=0)
 
     @field_validator('flightNumber')
     @classmethod

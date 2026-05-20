@@ -36,34 +36,10 @@ def create_bookings(
         session: Session = Depends(get_session),
         _=Depends(dispatcher_or_higher)
 ):
-    # Логика продажи билетов (упрощенно для примера)
-    flight = session.get(Flight, data.flightId)
-    if not flight or flight.free_seats < len(data.passengerIds):
-        raise HTTPException(status_code=400, detail="Места отсутствуют или рейс не найден")
-
-    results = []
-    code = data.bookingCode or generate_booking_code()
-
-    for p_id in data.passengerIds:
-        booking = Booking(
-            flight_id=flight.id, 
-            passenger_id=p_id, 
-            booking_code=code,
-            baggage_allowed=data.baggageAllowed,
-            payment_type=data.paymentType,
-            base_price=data.basePrice,
-            tax=data.tax,
-            additional_fees=data.additionalFees,
-            class_type=data.classType
-        )
-        session.add(booking)
-        results.append(booking)
-
-    flight.free_seats -= len(data.passengerIds)
-    session.add(flight)
-    session.commit()
-    for b in results: session.refresh(b)
-    return results
+    from app.controllers.booking_controller import sell_ticket as controller_sell_ticket
+    # Используем контроллер для продажи билетов с проверкой мест
+    bookings = controller_sell_ticket(data, session)
+    return bookings
 
 
 @router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
