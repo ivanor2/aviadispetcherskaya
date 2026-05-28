@@ -110,8 +110,6 @@ def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
                 seat=seats_to_assign[idx],
                 baggage_allowed=data.baggageAllowed,
                 payment_type=data.paymentType,
-                base_price=data.basePrice,
-                tax=data.tax,
                 additional_fees=data.additionalFees,
                 class_type=data.classType
             ))
@@ -126,8 +124,6 @@ def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
                     seat=conn_seat,
                     baggage_allowed=data.baggageAllowed,
                     payment_type=data.paymentType,
-                    base_price=data.basePrice,
-                    tax=data.tax,
                     additional_fees=data.additionalFees,
                     class_type=data.classType
                 ))
@@ -161,8 +157,6 @@ def add_connections_to_booking(booking_code: str, flight_ids: List[int], session
     first_booking = existing[0]
     baggage_allowed = first_booking.baggage_allowed
     payment_type = first_booking.payment_type
-    base_price = first_booking.base_price
-    tax = first_booking.tax
     additional_fees = first_booking.additional_fees
     class_type = first_booking.class_type
 
@@ -197,8 +191,6 @@ def add_connections_to_booking(booking_code: str, flight_ids: List[int], session
                     seat=seat,
                     baggage_allowed=baggage_allowed,
                     payment_type=payment_type,
-                    base_price=base_price,
-                    tax=tax,
                     additional_fees=additional_fees,
                     class_type=class_type
                 ))
