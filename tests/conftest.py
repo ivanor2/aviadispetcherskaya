@@ -284,7 +284,9 @@ def fake_flight_data(db_session, fake_airline_data, fake_airport_data):
         "departureTime": "10:00:00",
         "arrivalTime": "14:00:00",
         "totalSeats": 150, 
-        "freeSeats": 50
+        "freeSeats": 50,
+        "basePrice": 10000.0,
+        "baggagePrice": 1500.0
     }
 
 

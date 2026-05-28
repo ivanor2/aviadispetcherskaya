@@ -155,6 +155,10 @@ def populate_database(
             total_seats = random.choice([120, 150, 180, 200, 220, 250])
             # ✅ free_seets всегда равно total_seats при создании рейса
             free_seats = total_seats
+            
+            # Цены для рейса
+            base_price = round(random.uniform(5000, 50000), 2)  # Базовая цена от 5000 до 50000
+            baggage_price = round(random.uniform(500, 5000), 2)  # Цена багажа от 500 до 5000
 
             # Генерируем время отправления и прибытия
             dep_time = time(random.randint(0, 23), random.choice([0, 15, 30, 45]))
@@ -177,7 +181,9 @@ def populate_database(
                 departure_time=dep_time,
                 arrival_time=arrival_t,
                 total_seats=total_seats,
-                free_seats=free_seats
+                free_seats=free_seats,
+                base_price=base_price,
+                baggage_price=baggage_price
             ))
 
         session.add_all(flights)
@@ -223,8 +229,6 @@ def populate_database(
             # Генерируем случайные значения для новых полей
             baggage = random.choice([True, False])
             payment = random.choice(payment_types)
-            base_price = round(random.uniform(5000, 50000), 2)  # Базовая цена от 5000 до 50000
-            tax = round(base_price * 0.1, 2)  # Налог 10% от базовой цены
             additional_fees = round(random.uniform(0, 5000), 2)  # Доп сборы от 0 до 5000
             class_type = random.choice(["economy", "business", "first"])
             
@@ -241,8 +245,6 @@ def populate_database(
                 created_at=datetime.utcnow() - timedelta(days=random.randint(0, 7)),
                 baggage_allowed=baggage,
                 payment_type=payment,
-                base_price=base_price,
-                tax=tax,
                 additional_fees=additional_fees,
                 class_type=class_type
             ))
