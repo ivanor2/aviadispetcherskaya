@@ -1,3 +1,4 @@
+
 from sqlmodel import SQLModel, Field
 
 class Airline(SQLModel, table=True):

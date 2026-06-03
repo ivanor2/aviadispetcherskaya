@@ -1,0 +1,4707 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+The content has been processed where security check has been disabled.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Security check has been disabled - content may contain sensitive information
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.coveragerc
+.gitignore
+app/__init__.py
+app/api/v1/airline_router.py
+app/api/v1/airport_router.py
+app/api/v1/auth_router.py
+app/api/v1/booking_router.py
+app/api/v1/flight_router.py
+app/api/v1/passenger_router.py
+app/api/v2/airline_router.py
+app/api/v2/airport_router.py
+app/api/v2/auth_router.py
+app/api/v2/booking_router.py
+app/api/v2/flight_router.py
+app/api/v2/passenger_router.py
+app/controllers/airline_controller.py
+app/controllers/airport_controller.py
+app/controllers/booking_controller.py
+app/controllers/flight_controller.py
+app/controllers/passenger_controller.py
+app/controllers/user_controller.py
+app/core/security.py
+app/db/__init__.py
+app/db/database.py
+app/db/session.py
+app/main.py
+app/models/airline.py
+app/models/airport.py
+app/models/booking.py
+app/models/flight.py
+app/models/passenger.py
+app/models/user.py
+app/schemas/airline_schema.py
+app/schemas/airport_schema.py
+app/schemas/booking_schema.py
+app/schemas/flight_schema.py
+app/schemas/passenger_schema.py
+app/schemas/user_schema.py
+app/utils/__init__.py
+app/utils/populate_db.py
+readme.md
+requirements.txt
+test.db
+tests/__init__.py
+tests/api/__init__.py
+tests/api/controllers/__init__.py
+tests/api/controllers/test_airline_controller.py
+tests/api/controllers/test_airport_controller.py
+tests/api/controllers/test_booking_controller.py
+tests/api/controllers/test_flight_controller.py
+tests/api/controllers/test_passenger_controller.py
+tests/api/controllers/test_user_controller.py
+tests/api/rourters/__init__.py
+tests/api/rourters/test_auth_integration.py
+tests/api/rourters/test_v1_v2_comparsion.py
+tests/api/rourters/test_v2_features.py
+tests/api/test_auth.py
+tests/api/test_security.py
+tests/conftest.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".coveragerc">
+[run]
+source = app
+omit =
+    app/utils/populate_db.py
+    app/db/database.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__.:
+</file>
+
+<file path="app/api/v2/airline_router.py">
+from fastapi import APIRouter, Depends, Query, status
+from sqlmodel import Session, select
+from app.db.session import get_session
+from app.models.airline import Airline
+from app.schemas.airline_schema import AirlineCreate, AirlineResponse
+from app.core.security import admin_required, get_current_user
+from fastapi_pagination import Page
+
+router = APIRouter()
+
+@router.get("", response_model=Page[AirlineResponse])
+def list_airlines(session: Session = Depends(get_session), _=Depends(get_current_user),
+                  search: str = Query(None), sort_by: str = Query("code"), order: str = Query("asc")):
+    q = select(Airline)
+    if search: q = q.where(Airline.name.ilike(f"%{search}%") | Airline.code.ilike(f"%{search}%"))
+    order_col = getattr(Airline, sort_by, Airline.code)
+    return q.order_by(order_col.asc() if order == "asc" else order_col.desc())
+
+@router.get("/{code}", response_model=AirlineResponse)
+def get_airline(code: str, session: Session = Depends(get_session), _=Depends(get_current_user)):
+    al = session.get(Airline, code.upper())
+    if not al: raise status.HTTP_404_NOT_FOUND
+    return al
+
+@router.post("", response_model=AirlineResponse, status_code=201, dependencies=[Depends(admin_required)])
+def create_airline(data: AirlineCreate, session: Session = Depends(get_session)):
+    al = Airline(code=data.code.upper(), name=data.name)
+    session.add(al); session.commit(); session.refresh(al)
+    return al
+
+@router.put("/{code}", response_model=AirlineResponse, dependencies=[Depends(admin_required)])
+def update_airline(code: str, data: AirlineCreate, session: Session = Depends(get_session)):
+    al = session.get(Airline, code.upper())
+    if not al: raise status.HTTP_404_NOT_FOUND
+    al.name = data.name
+    session.commit(); session.refresh(al)
+    return al
+
+@router.delete("/{code}", status_code=204, dependencies=[Depends(admin_required)])
+def delete_airline(code: str, session: Session = Depends(get_session)):
+    al = session.get(Airline, code.upper())
+    if not al: raise status.HTTP_404_NOT_FOUND
+    session.delete(al); session.commit()
+</file>
+
+<file path="app/controllers/airline_controller.py">
+from sqlmodel import Session, select
+from fastapi import HTTPException, status
+from app.models.airline import Airline
+from app.schemas.airline_schema import AirlineCreate
+from typing import List
+
+
+def get_all_airlines(session: Session) -> List[Airline]:
+    return session.exec(select(Airline)).all()
+
+
+def get_airline_by_code(code: str, session: Session) -> Airline:
+    airline = session.get(Airline, code.upper())
+    if not airline:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Авиакомпания не найдена")
+    return airline
+
+
+def create_airline(data: AirlineCreate, session: Session) -> Airline:
+    existing = session.get(Airline, data.code)
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Авиакомпания с таким кодом уже существует")
+
+    airline = Airline(code=data.code, name=data.name)
+    session.add(airline)
+    session.commit()
+    session.refresh(airline)
+    return airline
+
+
+def update_airline(code: str, data: AirlineCreate, session: Session) -> Airline:
+    airline = session.get(Airline, code.upper())
+    if not airline:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Авиакомпания не найдена")
+    airline.name = data.name
+    session.commit()
+    session.refresh(airline)
+    return airline
+
+
+def delete_airline(code: str, session: Session):
+    airline = session.get(Airline, code.upper())
+    if not airline:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Авиакомпания не найдена")
+    session.delete(airline)
+    session.commit()
+</file>
+
+<file path="app/controllers/airport_controller.py">
+# app/controllers/airport_controller.py
+
+from sqlmodel import Session, select
+from fastapi import HTTPException, status
+from app.models.airport import Airport
+from app.schemas.airport_schema import AirportCreate, AirportUpdate
+from typing import List
+
+def get_all_airports(session: Session) -> List[Airport]:
+    """
+    Возвращает список всех аэропортов (id, ИКАО и название) из БД.
+    """
+    airports_db = session.exec(select(Airport)).all()
+    return airports_db
+
+def get_airport_by_id(airport_id: int, session: Session) -> Airport:
+    """
+    Возвращает аэропорт по его ID.
+    """
+    airport = session.get(Airport, airport_id)
+    if not airport:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Аэропорт не найден"
+        )
+    return airport
+
+def get_airport_by_icao(icao_code: str, session: Session) -> Airport:
+    """
+    Проверяет существование аэропорта по официальному ИКАО-коду в БД и возвращает его.
+    """
+    airport = session.exec(
+        select(Airport).where(Airport.icao_code == icao_code.upper())
+    ).first()
+    if not airport:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Аэропорт с таким ICAO-кодом не найден"
+        )
+    return airport
+
+def create_airport(data: AirportCreate, session: Session) -> Airport:
+    """
+    Создаёт новый аэропорт.
+    """
+    # Проверка на дубликат ICAO
+    existing = session.exec(
+        select(Airport).where(Airport.icao_code == data.icaoCode.upper())
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Аэропорт с таким ICAO-кодом уже существует"
+        )
+
+    airport = Airport(
+        icao_code=data.icaoCode.upper(), # Сохраняем в верхнем регистре для консистентности
+        name=data.name
+    )
+    session.add(airport)
+    session.commit()
+    session.refresh(airport)
+    return airport
+
+def update_airport(airport_id: int, data: AirportUpdate, session: Session) -> Airport:
+    """
+    Обновляет аэропорт по ID.
+    """
+    airport = session.get(Airport, airport_id)
+    if not airport:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Аэропорт не найден"
+        )
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(airport, key, value)
+
+    session.add(airport)
+    session.commit()
+    session.refresh(airport)
+    return airport
+
+def delete_airport(airport_id: int, session: Session):
+    """
+    Удаляет аэропорт по ID.
+    """
+    airport = session.get(Airport, airport_id)
+    if not airport:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Аэропорт не найден"
+        )
+
+    session.delete(airport)
+    session.commit()
+</file>
+
+<file path="app/db/session.py">
+from sqlmodel import Session
+from app.db.database import engine
+
+
+def get_session():
+    """Получение сессии БД"""
+    with Session(engine) as session:
+        yield session
+</file>
+
+<file path="app/models/airline.py">
+from sqlmodel import SQLModel, Field
+
+class Airline(SQLModel, table=True):
+    __tablename__ = "airline"
+    code: str = Field(primary_key=True, max_length=3, index=True, description="3-буквенный IATA/ICAO код")
+    name: str = Field(max_length=100, description="Название авиакомпании")
+</file>
+
+<file path="app/models/airport.py">
+# app/models/airport.py
+
+from sqlmodel import SQLModel, Field
+from typing import Optional
+
+class Airport(SQLModel, table=True):
+    __tablename__ = "airport"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    icao_code: str = Field(index=True, unique=True, max_length=4) # Уникальный индекс на ICAO
+    name: Optional[str] = Field(default=None, max_length=200)
+</file>
+
+<file path="app/models/passenger.py">
+from sqlmodel import SQLModel, Field
+from typing import Optional
+from datetime import date
+
+class Passenger(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    passport_number: str
+    passport_issued_by: str
+    passport_issue_date: date
+    full_name: str
+    birth_date: date
+</file>
+
+<file path="app/schemas/airline_schema.py">
+from pydantic import BaseModel, Field, field_validator
+
+class AirlineCreate(BaseModel):
+    code: str = Field(..., min_length=3, max_length=3, description="Код из 3 заглавных латинских букв")
+    name: str = Field(..., max_length=100)
+
+    @field_validator('code')
+    @classmethod
+    def validate_code(cls, v):
+        if not v.isalpha() or not v.isupper():
+            raise ValueError('Код должен состоять из 3 заглавных латинских букв')
+        return v
+
+class AirlineResponse(BaseModel):
+    code: str
+    name: str
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="tests/api/controllers/__init__.py">
+"""Тесты для контроллеров приложения.
+
+Содержит модульные тесты для:
+- airline_controller - управление авиакомпаниями
+- airport_controller - управление аэропортами
+- booking_controller - бронирование билетов
+- flight_controller - управление рейсами
+- passenger_controller - управление пассажирами
+- user_controller - управление пользователями
+"""
+</file>
+
+<file path="app/api/v1/airline_router.py">
+from fastapi import APIRouter, Depends, status
+from sqlmodel import Session
+from app.db.session import get_session
+from app.schemas.airline_schema import AirlineCreate, AirlineResponse
+import app.controllers.airline_controller as ctrl
+from app.core.security import admin_required, get_current_user
+from typing import List
+
+router = APIRouter(prefix="", tags=["Авиакомпании"])
+
+@router.get("", response_model=List[AirlineResponse])
+def list_airlines(session: Session = Depends(get_session), _=Depends(get_current_user)):
+    return ctrl.get_all_airlines(session)
+
+@router.get("/{code}", response_model=AirlineResponse)
+def get_airline(code: str, session: Session = Depends(get_session), _=Depends(get_current_user)):
+    return ctrl.get_airline_by_code(code, session)
+
+@router.post("", response_model=AirlineResponse, status_code=status.HTTP_201_CREATED)
+def create_airline(data: AirlineCreate, session: Session = Depends(get_session), _=Depends(admin_required)):
+    return ctrl.create_airline(data, session)
+
+@router.put("/{code}", response_model=AirlineResponse)
+def update_airline(code: str, data: AirlineCreate, session: Session = Depends(get_session), _=Depends(admin_required)):
+    return ctrl.update_airline(code, data, session)
+
+@router.delete("/{code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_airline(code: str, session: Session = Depends(get_session), _=Depends(admin_required)):
+    ctrl.delete_airline(code, session)
+</file>
+
+<file path="app/api/v2/airport_router.py">
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlmodel import Session, select, col, or_
+from app.db.session import get_session
+from app.models.airport import Airport
+from app.schemas.airport_schema import AirportCreate, AirportUpdate, AirportResponse
+from app.core.security import admin_required, get_current_user
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+
+router = APIRouter()
+
+
+@router.get("", response_model=Page[AirportResponse])
+def list_airports(
+        session: Session = Depends(get_session),
+        search: str = Query(None),
+        sort_by: str = Query("icao_code"),
+        order: str = Query("asc"),
+        _=Depends(get_current_user)
+):
+    query = select(Airport)
+    if search:
+        query = query.where(
+            or_(
+                col(Airport.name).ilike(f"%{search}%"),
+                col(Airport.icao_code).ilike(f"%{search}%")
+            )
+        )
+
+    # Маппинг для сортировки (обработка camelCase из запроса в snake_case модели)
+    attr_map = {"icaoCode": "icao_code", "name": "name"}
+    sort_attr = attr_map.get(sort_by, sort_by)
+    column = getattr(Airport, sort_attr, Airport.icao_code)
+
+    query = query.order_by(column.asc() if order == "asc" else column.desc())
+    return paginate(session, query)
+
+
+@router.post("", response_model=AirportResponse, status_code=201, dependencies=[Depends(admin_required)])
+def create_airport(data: AirportCreate, session: Session = Depends(get_session)):
+    if session.exec(select(Airport).where(Airport.icao_code == data.icaoCode.upper())).first():
+        raise HTTPException(status_code=400, detail="ICAO код уже занят")
+    ap = Airport(icao_code=data.icaoCode.upper(), name=data.name)
+    session.add(ap)
+    session.commit()
+    session.refresh(ap)
+    return ap
+</file>
+
+<file path="app/api/v2/auth_router.py">
+from fastapi import APIRouter, Depends, status, Response, HTTPException
+from sqlmodel import Session, select
+from app.db.session import get_session
+from app.models.user import User
+from app.schemas.user_schema import UserCreate, UserLogin, UserResponse, TokenResponse, UserUpdateRole
+from app.core.security import (
+    hash_password, verify_password, create_access_token,
+    create_refresh_token, decode_token, get_current_user, admin_required
+)
+
+router = APIRouter()
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register(data: UserCreate, session: Session = Depends(get_session)):
+    if session.exec(select(User).where(User.username == data.username)).first():
+        raise HTTPException(status_code=400, detail="Пользователь уже существует")
+    user = User(username=data.username, password=hash_password(data.password), role="guest")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(data: UserLogin, response: Response, session: Session = Depends(get_session)):
+    user = session.exec(select(User).where(User.username == data.username)).first()
+    if not user or not verify_password(data.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверные учетные данные")
+
+    access_token = create_access_token({"sub": user.username})
+    refresh_token = create_refresh_token({"sub": user.username})
+
+    # Установка токена в куки для тестов, которые это проверяют
+    response.set_cookie(key="access_token", value=access_token, httponly=True)
+
+    return {
+        "access_token": access_token,
+        "refreshToken": refresh_token,
+        "tokenType": "bearer"
+    }
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(refresh_token: str, session: Session = Depends(get_session)):
+    username = decode_token(refresh_token, expected_type="refresh")
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалидный refresh токен")
+    return {
+        "access_token": create_access_token({"sub": username}),
+        "tokenType": "bearer"
+    }
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(key="access_token")
+    return {"detail": "Logged out"}
+
+
+@router.put("/{user_id}/role", response_model=UserResponse, dependencies=[Depends(admin_required)])
+def change_role(user_id: int, data: UserUpdateRole, session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user.role = data.role
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+</file>
+
+<file path="app/api/v2/passenger_router.py">
+from typing import List
+
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlmodel import Session, select, or_, col
+from app.db.session import get_session
+from app.models.booking import Booking
+from app.models.passenger import Passenger
+from app.schemas.booking_schema import BookingResponse
+from app.schemas.passenger_schema import PassengerCreate, PassengerUpdate, PassengerResponse
+from app.core.security import dispatcher_or_higher, get_current_user
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+
+router = APIRouter()
+
+
+@router.get("", response_model=Page[PassengerResponse])
+def list_passengers(
+    session: Session = Depends(get_session),
+    search: str = Query(None),
+    _=Depends(get_current_user)
+):
+    query = select(Passenger)
+    if search:
+        query = query.where(
+            or_(
+                col(Passenger.full_name).ilike(f"%{search}%"),
+                col(Passenger.passport_number).contains(search)
+            )
+        )
+    return paginate(session, query.order_by(Passenger.full_name))
+
+
+@router.get("/{passenger_id}", response_model=PassengerResponse)
+def get_passenger(passenger_id: int, session: Session = Depends(get_session), _=Depends(get_current_user)):
+    p = session.get(Passenger, passenger_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Пассажир не найден")
+    return p
+
+
+@router.post("", response_model=PassengerResponse, status_code=201)
+def create_passenger(data: PassengerCreate, session: Session = Depends(get_session), _=Depends(dispatcher_or_higher)):
+    if session.exec(select(Passenger).where(Passenger.passport_number == data.passportNumber)).first():
+        raise HTTPException(status_code=400, detail="Duplicate passport")
+
+    p = Passenger(
+        passport_number=data.passportNumber,
+        full_name=data.fullName,
+        birth_date=data.birthDate,
+        passport_issued_by=data.passportIssuedBy,
+        passport_issue_date=data.passportIssueDate
+    )
+    session.add(p)
+    session.commit()
+    session.refresh(p)
+    return p
+</file>
+
+<file path="app/models/user.py">
+from sqlmodel import SQLModel, Field
+from typing import Optional
+from datetime import date
+
+
+class User(SQLModel, table=True):
+    """Модель пользователя"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, max_length=50)
+    password: str = Field(max_length=200)
+    role: str = Field(default="dispatcher", max_length=20)
+    created_at: date = Field(default_factory=date.today)
+</file>
+
+<file path="app/schemas/airport_schema.py">
+# app/schemas/airport_schema.py
+
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional
+
+# --- НОВОЕ: Множество допустимых префиксов из ТЗ ---
+VALID_ICAO_PREFIXES = {
+    "AG", "AN", "AY", "BG", "BI", "C", "DA", "DB", "DF", "DG", "DI", "DN", "DR", "DT", "DX",
+    "EB", "ED", "EE", "EF", "EG", "EH", "EI", "EK", "EL", "EN", "EP", "ES", "ET", "EV", "EY",
+    "FA", "FB", "FC", "FD", "FE", "FG", "FH", "FI", "FJ", "FK", "FL", "FM", "FN", "FO", "FP",
+    "FQ", "FS", "FT", "FV", "FW", "FX", "FY", "FZ", "GA", "GB", "GC", "GE", "GF", "GG", "GL",
+    "GM", "GO", "GQ", "GS", "GU", "GV", "HA", "HB", "HC", "HD", "HE", "HF", "HH", "HK", "HL",
+    "HR", "HS", "HT", "HU", "K", "LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LI", "LJ",
+    "LK", "LL", "LM", "LN", "LO", "LP", "LQ", "LR", "LS", "LT", "LU", "LV", "LW", "LX", "LY",
+    "LZ", "MB", "MD", "MG", "MH", "MK", "MM", "MN", "MP", "MR", "MS", "MT", "MU", "MW", "MY",
+    "MZ", "NC", "NF", "NG", "NI", "NL", "NS", "NT", "NV", "NW", "NZ", "OA", "OB", "OE", "OI",
+    "OJ", "OK", "OL", "OM", "OO", "OP", "OR", "OS", "OT", "OY", "PA", "PB", "PC", "PF", "PG",
+    "PH", "PJ", "PK", "PL", "PM", "PO", "PP", "PT", "PW", "RC", "RJ", "RK", "RO", "RP", "SA",
+    "SB", "SC", "SD", "SE", "SF", "SG", "SK", "SL", "SM", "SN", "SO", "SP", "SS", "SU", "SV",
+    "SW", "SY", "TA", "TB", "TD", "TF", "TG", "TI", "TJ", "TK", "TL", "TN", "TQ", "TR", "TT",
+    "TU", "TV", "TX", "U", "UA", "UB", "UC", "UD", "UG", "UK", "UM", "UT", "VA", "VC", "VD",
+    "VE", "VG", "VH", "VI", "VL", "VM", "VN", "VO", "VQ", "VR", "VT", "VV", "VY", "WA", "WB",
+    "WI", "WM", "WP", "WQ", "WR", "WS", "Y", "Z", "ZK", "ZM"
+}
+# --- /НОВОЕ ---
+
+class AirportCreate(BaseModel):
+    icaoCode: str = Field(..., description="Официальный ICAO-код аэропорта (2-4 символа)", examples=["UUSS"])
+    name: str = Field(..., max_length=200, description="Название аэропорта или страны")
+
+    @field_validator('icaoCode')
+    def validate_icao_code(cls, v):
+        # Проверка длины
+        if len(v) < 2 or len(v) > 4:
+            raise ValueError('ICAO-код должен состоять из 2-4 символов')
+
+        # Проверка, что код состоит только из заглавных латинских букв
+        if not v.isalpha() or not v.isupper():
+            raise ValueError('ICAO-код должен состоять только из заглавных латинских букв')
+
+        # Проверка, что первые 2 символа находятся в списке допустимых префиксов
+        if v[:2] not in VALID_ICAO_PREFIXES:
+             raise ValueError(f'ICAO-код должен начинаться с одного из допустимых префиксов: {sorted(VALID_ICAO_PREFIXES)}')
+
+        return v
+
+class AirportUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=200, description="Новое название аэропорта или страны")
+
+class AirportResponse(BaseModel):
+    id: int
+    icaoCode: str = Field(alias="icao_code")
+    name: str
+
+    class Config:
+        from_attributes = True
+</file>
+
+<file path="tests/__init__.py">
+"""Пакет тестов для API приложения.
+
+Содержит тесты для контроллеров, роутеров и интеграционные тесты.
+"""
+</file>
+
+<file path="tests/api/__init__.py">
+"""Пакет тестов для API компонентов.
+
+Содержит тесты для контроллеров и роутеров API версий v1 и v2.
+"""
+</file>
+
+<file path="tests/api/controllers/test_airline_controller.py">
+# tests/api/controllers/test_airline_controller.py
+"""
+Тесты для контроллера авиакомпаний (AirlineController).
+
+Проверяет CRUD операции:
+- Создание авиакомпании (успешно и дубликат)
+- Получение авиакомпании по коду (существующей и несуществующей)
+- Обновление авиакомпании
+- Удаление авиакомпании
+- Получение списка всех авиакомпаний
+"""
+import pytest
+from fastapi import HTTPException, status
+from app.controllers.airline_controller import (
+    create_airline, get_airline_by_code, get_all_airlines, update_airline, delete_airline
+)
+from app.schemas.airline_schema import AirlineCreate
+
+
+@pytest.mark.usefixtures("db_session")
+class TestAirlineController:
+    """Набор тестов для функциональности контроллера авиакомпаний."""
+
+    def test_create_success(self, db_session, fake_airline_data):
+        """
+        Тестирует успешное создание авиакомпании.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airline_data: Фикстура с данными авиакомпании.
+            
+        Asserts:
+            - Код созданной авиакомпании совпадает с входными данными.
+        """
+        al = create_airline(AirlineCreate(**fake_airline_data), db_session)
+        assert al.code == fake_airline_data["code"]
+
+    def test_create_duplicate(self, db_session, fake_airline_data):
+        """
+        Тестирует создание дубликата авиакомпании (ошибка 400).
+        
+        Проверяет, что попытка создать авиакомпанию с уже существующим кодом
+        вызывает HTTPException со статусом 400 BAD REQUEST.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airline_data: Фикстура с данными авиакомпании.
+        """
+        create_airline(AirlineCreate(**fake_airline_data), db_session)
+        with pytest.raises(HTTPException) as exc:
+            create_airline(AirlineCreate(**fake_airline_data), db_session)
+        assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_get_success(self, db_session, fake_airline_data):
+        """
+        Тестирует успешное получение авиакомпании по коду.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airline_data: Фикстура с данными авиакомпании.
+            
+        Asserts:
+            - Название найденной авиакомпании совпадает с входными данными.
+        """
+        create_airline(AirlineCreate(**fake_airline_data), db_session)
+        al = get_airline_by_code(fake_airline_data["code"], db_session)
+        assert al.name == fake_airline_data["name"]
+
+    def test_get_not_found(self, db_session):
+        """
+        Тестирует получение несуществующей авиакомпании (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            get_airline_by_code("ZZZ", db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_list_empty(self, db_session):
+        """
+        Тестирует получение списка авиакомпаний при пустой базе.
+        
+        Args:
+            db_session: Сессия базы данных.
+            
+        Asserts:
+            - Возвращается пустой список.
+        """
+        assert get_all_airlines(db_session) == []
+
+    def test_update_success(self, db_session, fake_airline_data):
+        """
+        Тестирует успешное обновление авиакомпании.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airline_data: Фикстура с данными авиакомпании.
+            
+        Asserts:
+            - Название авиакомпании изменено на новое.
+        """
+        create_airline(AirlineCreate(**fake_airline_data), db_session)
+        upd = update_airline(fake_airline_data["code"], AirlineCreate(code=fake_airline_data["code"], name="New"), db_session)
+        assert upd.name == "New"
+
+    def test_update_not_found(self, db_session, fake_airline_data):
+        """
+        Тестирует обновление несуществующей авиакомпании.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airline_data: Фикстура с данными авиакомпании.
+            
+        Asserts:
+            - Вызывается HTTPException.
+        """
+        with pytest.raises(HTTPException):
+            update_airline("XXX", AirlineCreate(code="XXX", name="Test"), db_session)
+
+    def test_delete_success(self, db_session, fake_airline_data):
+        """
+        Тестирует успешное удаление авиакомпании.
+        
+        После удаления проверяет, что попытка получить удалённую авиакомпанию
+        вызывает исключение.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airline_data: Фикстура с данными авиакомпании.
+        """
+        create_airline(AirlineCreate(**fake_airline_data), db_session)
+        delete_airline(fake_airline_data["code"], db_session)
+        with pytest.raises(HTTPException):
+            get_airline_by_code(fake_airline_data["code"], db_session)
+
+    def test_delete_not_found(self, db_session):
+        """
+        Тестирует удаление несуществующей авиакомпании (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            delete_airline("NNN", db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+</file>
+
+<file path="tests/api/controllers/test_airport_controller.py">
+# tests/api/controllers/test_airport_controller.py
+"""
+Тесты для контроллера аэропортов (AirportController).
+
+Проверяет CRUD операции:
+- Создание аэропорта (успешно и дубликат ICAO-кода)
+- Получение аэропорта по ID и ICAO-коду
+- Обновление аэропорта
+- Удаление аэропорта
+- Получение списка всех аэропортов
+"""
+import pytest
+from fastapi import HTTPException, status
+from app.controllers.airport_controller import (
+    create_airport, get_airport_by_id, get_airport_by_icao,
+    update_airport, delete_airport, get_all_airports
+)
+from app.schemas.airport_schema import AirportCreate, AirportUpdate
+from tests.conftest import fake  # ✅ Фикс NameError
+
+
+@pytest.mark.usefixtures("db_session")
+class TestAirportController:
+    """Набор тестов для функциональности контроллера аэропортов."""
+
+    def test_get_all_airports_empty(self, db_session):
+        """
+        Тестирует получение списка аэропортов при пустой базе.
+        
+        Args:
+            db_session: Сессия базы данных.
+            
+        Asserts:
+            - Возвращается пустой список.
+        """
+        assert get_all_airports(db_session) == []
+
+    def test_get_all_airports_with_faker_data(self, db_session, fake_airport_data):
+        """
+        Тестирует получение списка аэропортов с данными.
+        
+        Создаёт один аэропорт и проверяет, что список содержит один элемент.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airport_data: Фикстура с данными аэропорта.
+        """
+        create_airport(AirportCreate(**fake_airport_data), db_session)
+        assert len(get_all_airports(db_session)) == 1
+
+    def test_get_airport_by_id_success(self, db_session, fake_airport_data):
+        """
+        Тестирует успешное получение аэропорта по ID.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airport_data: Фикстура с данными аэропорта.
+            
+        Asserts:
+            - ID найденного аэропорта совпадает с искомым.
+        """
+        ap = create_airport(AirportCreate(**fake_airport_data), db_session)
+        assert get_airport_by_id(ap.id, db_session).id == ap.id
+
+    def test_get_airport_by_id_not_found(self, db_session, max_airport_id):
+        """
+        Тестирует получение несуществующего аэропорта по ID (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            max_airport_id: Следующий доступный ID (несуществующий).
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            get_airport_by_id(max_airport_id, db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_get_airport_by_icao_not_found(self, db_session):
+        """
+        Тестирует получение аэропорта по несуществующему ICAO-коду (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            get_airport_by_icao("XXXX", db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_create_airport_success(self, db_session, fake_airport_data):
+        """
+        Тестирует успешное создание аэропорта.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airport_data: Фикстура с данными аэропорта.
+            
+        Asserts:
+            - ICAO-код созданного аэропорта совпадает с входными данными.
+        """
+        ap = create_airport(AirportCreate(**fake_airport_data), db_session)
+        assert ap.icao_code == fake_airport_data["icaoCode"]
+
+    def test_create_airport_duplicate_icao(self, db_session, fake_airport_data):
+        """
+        Тестирует создание аэропорта с дублирующимся ICAO-кодом (ошибка 400).
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airport_data: Фикстура с данными аэропорта.
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 400 BAD REQUEST.
+        """
+        create_airport(AirportCreate(**fake_airport_data), db_session)
+        with pytest.raises(HTTPException) as exc:
+            create_airport(AirportCreate(**fake_airport_data), db_session)
+        assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_update_airport_success(self, db_session, fake_airport_data):
+        """
+        Тестирует успешное обновление аэропорта.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airport_data: Фикстура с данными аэропорта.
+            
+        Asserts:
+            - Название аэропорта содержит новое значение.
+        """
+        ap = create_airport(AirportCreate(**fake_airport_data), db_session)
+        updated = update_airport(ap.id, AirportUpdate(name="Updated " + fake.city()), db_session)
+        assert "Updated" in updated.name
+
+    def test_update_airport_not_found(self, db_session, max_airport_id):
+        """
+        Тестирует обновление несуществующего аэропорта (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            max_airport_id: Следующий доступный ID (несуществующий).
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            update_airport(max_airport_id, AirportUpdate(name="X"), db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_delete_airport_success(self, db_session, fake_airport_data):
+        """
+        Тестирует успешное удаление аэропорта.
+        
+        После удаления проверяет, что попытка получить удалённый аэропорт
+        вызывает исключение.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_airport_data: Фикстура с данными аэропорта.
+        """
+        ap = create_airport(AirportCreate(**fake_airport_data), db_session)
+        delete_airport(ap.id, db_session)
+        with pytest.raises(HTTPException):
+            get_airport_by_id(ap.id, db_session)
+
+    def test_delete_airport_not_found(self, db_session, max_airport_id):
+        """
+        Тестирует удаление несуществующего аэропорта (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            max_airport_id: Следующий доступный ID (несуществующий).
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            delete_airport(max_airport_id, db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+</file>
+
+<file path="tests/api/controllers/test_flight_controller.py">
+"""Тесты для контроллера рейсов.
+
+Проверяют CRUD операции, поиск рейсов и обработку ошибок для flight_controller.
+"""
+import pytest
+from fastapi import HTTPException
+from pydantic import ValidationError  # ✅ Добавлено для теста префикса
+from sqlmodel import select
+from app.models.flight import Flight  # ✅ Исправлен импорт
+from app.controllers.flight_controller import (
+    create_flight, get_flight_by_id, delete_flight,
+    search_flights_by_arrival, delete_all_flights, update_flight, get_flight_with_passengers_by_number
+)
+from app.schemas.flight_schema import FlightCreate, FlightUpdate
+from app.schemas.passenger_schema import PassengerCreate
+from app.controllers.passenger_controller import create_passenger
+from app.controllers.booking_controller import sell_ticket
+from app.schemas.booking_schema import BookingCreate
+
+
+@pytest.mark.usefixtures("db_session")
+class TestFlightController:
+    """Набор тестов для проверки функциональности flight_controller."""
+
+    def test_create_success(self, db_session, fake_flight_data):
+        """Тестирует успешное создание рейса.
+        
+        Проверяет, что рейс создается с корректным номером.
+        """
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        assert f.flight_number == fake_flight_data["flightNumber"]
+
+    def test_create_airline_not_found(self, db_session, fake_flight_data):
+        """Тестирует ошибку при создании рейса несуществующей авиакомпании.
+        
+        Проверяет, что попытка создать рейс с неизвестным airlineCode вызывает HTTPException.
+        """
+        fake_flight_data["airlineCode"] = "XXX"
+        fake_flight_data["flightNumber"] = "XXX-111"
+        with pytest.raises(HTTPException) as exc:
+            create_flight(FlightCreate(**fake_flight_data), db_session)
+        assert "не зарегистрирована" in exc.value.detail
+
+    def test_create_same_airports(self, db_session, fake_flight_data):
+        """Тестирует защиту от создания рейса с одинаковыми аэропортами.
+        
+        Проверяет, что вылет и прилет из одного аэропорта запрещены.
+        """
+        fake_flight_data["arrivalAirportIcao"] = fake_flight_data["departureAirportIcao"]
+        with pytest.raises(HTTPException) as exc:
+            create_flight(FlightCreate(**fake_flight_data), db_session)
+        assert "не могут совпадать" in exc.value.detail
+
+    def test_create_prefix_mismatch(self, db_session, fake_flight_data):
+        """Тестирует валидацию префикса номера рейса.
+        
+        Проверяет, что номер рейса должен начинаться с кода авиакомпании.
+        Ожидается ValidationError от Pydantic.
+        """
+        fake_flight_data["flightNumber"] = "MIS-111"  # Префикс MIS != airlineCode
+        # ✅ ИСПРАВЛЕНО: Ожидаем ValidationError от Pydantic, а не HTTPException
+        with pytest.raises(ValidationError):
+            create_flight(FlightCreate(**fake_flight_data), db_session)
+
+    def test_get_by_id_success(self, db_session, fake_flight_data):
+        """Тестирует успешное получение рейса по ID.
+        
+        Проверяет, что рейс находится по своему идентификатору.
+        """
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        assert get_flight_by_id(f.id, db_session).id == f.id
+
+    def test_get_by_id_not_found(self, db_session, max_flight_id):
+        """Тестирует обработку ошибки при получении несуществующего рейса.
+        
+        Проверяет, что запрос несуществующего ID возвращает 404.
+        """
+        with pytest.raises(HTTPException) as exc:
+            get_flight_by_id(max_flight_id, db_session)
+        assert exc.value.status_code == 404
+
+    def test_update_success(self, db_session, fake_flight_data):
+        """Тестирует успешное обновление данных рейса.
+        
+        Проверяет, что количество мест обновляется корректно.
+        """
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        upd = update_flight(f.id, FlightUpdate(totalSeats=200), db_session)
+        assert upd.total_seats == 200
+
+    def test_delete_cascade(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует каскадное удаление рейса с бронированиями.
+        
+        Проверяет, что при удалении рейса удаляются связанные бронирования.
+        """
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+
+        delete_flight(f.id, db_session)
+        with pytest.raises(HTTPException):
+            get_flight_by_id(f.id, db_session)
+
+    def test_search_by_arrival_found(self, db_session, fake_flight_data):
+        """Тестирует поиск рейсов по аэропорту прибытия.
+        
+        Проверяет, что поиск возвращает рейсы с указанным аэропортом назначения.
+        """
+        create_flight(FlightCreate(**fake_flight_data), db_session)
+        res = search_flights_by_arrival("Arrival",
+                                        db_session)  # Ищем по имени, которое было сгенерировано как "Arrival"
+        assert len(res) >= 1
+
+    def test_delete_all(self, db_session, fake_flight_data):
+        """Тестирует удаление всех рейсов.
+        
+        Проверяет, что после удаления список рейсов пуст.
+        """
+        create_flight(FlightCreate(**fake_flight_data), db_session)
+        delete_all_flights(db_session)
+        # ✅ ИСПРАВЛЕНО: f.__class__ заменено на Flight
+        assert db_session.exec(select(Flight)).all() == []
+
+    def test_search_flights_empty(self, db_session):
+        """Тестирует поиск при отсутствии результатов.
+        
+        Проверяет, что поиск по несуществующему аэропорту возвращает пустой список.
+        Покрывает строки 143-145 в flight_controller.py.
+        """
+        res = search_flights_by_arrival("NONEXISTENT", db_session)
+        assert res == []
+
+    def test_get_flight_with_passengers_success(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует получение рейса с пассажирами.
+        
+        Проверяет, что возвращается рейс со списком забронировавших пассажиров.
+        Покрывает строки 148-163 в flight_controller.py.
+        """
+        from app.schemas.flight_schema import FlightCreate
+        from app.schemas.passenger_schema import PassengerCreate
+        from app.schemas.booking_schema import BookingCreate
+        from app.controllers.booking_controller import sell_ticket
+
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+
+        flight, passengers = get_flight_with_passengers_by_number(fake_flight_data["flightNumber"], db_session)
+        assert flight.id == f.id
+        assert len(passengers) == 1
+</file>
+
+<file path="tests/api/controllers/test_passenger_controller.py">
+"""Тесты для контроллера пассажиров.
+
+Проверяют CRUD операции, поиск и обработку ошибок для пассажирского контроллера.
+"""
+import pytest
+from fastapi import HTTPException, status
+from app.controllers.passenger_controller import (
+    create_passenger, get_all_passengers, get_passenger_by_id,
+    find_passenger_by_passport, find_passengers_by_name,
+    delete_passenger, update_passenger
+)
+from app.schemas.passenger_schema import PassengerCreate, PassengerUpdate
+
+
+@pytest.mark.usefixtures("db_session")
+class TestPassengerController:
+    """Набор тестов для проверки функциональности passenger_controller."""
+
+    def test_create_success(self, db_session, fake_passenger_data):
+        """Тестирует успешное создание пассажира.
+        
+        Проверяет, что пассажир создается с корректным номером паспорта.
+        """
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        assert p.passport_number == fake_passenger_data["passportNumber"]
+
+    def test_create_duplicate(self, db_session, fake_passenger_data):
+        """Тестирует защиту от дублирования пассажиров.
+        
+        Проверяет, что попытка создать пассажира с существующим passportNumber
+        вызывает HTTPException с соответствующим сообщением.
+        """
+        create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        with pytest.raises(HTTPException) as exc:
+            create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        assert "уже зарегистрирован" in exc.value.detail
+
+    def test_get_all(self, db_session, fake_passenger_data):
+        """Тестирует получение списка всех пассажиров.
+        
+        Проверяет, что после создания одного пассажира список содержит один элемент.
+        """
+        create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        assert len(get_all_passengers(db_session)) == 1
+
+    def test_get_by_id_success(self, db_session, fake_passenger_data):
+        """Тестирует успешное получение пассажира по ID.
+        
+        Проверяет, что пассажир находится по своему идентификатору.
+        """
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        assert get_passenger_by_id(p.id, db_session).id == p.id
+
+    def test_get_by_id_not_found(self, db_session, max_passenger_id):
+        """Тестирует обработку ошибки при получении несуществующего пассажира.
+        
+        Проверяет, что запрос несуществующего ID возвращает 404.
+        """
+        with pytest.raises(HTTPException) as exc:
+            get_passenger_by_id(max_passenger_id, db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_find_by_passport(self, db_session, fake_passenger_data):
+        """Тестирует поиск пассажира по номеру паспорта.
+        
+        Проверяет, что пассажир находится по своему passportNumber.
+        """
+        create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        res = find_passenger_by_passport(fake_passenger_data["passportNumber"], db_session)
+        assert res.passport_number == fake_passenger_data["passportNumber"]
+
+    def test_find_by_passport_not_found(self, db_session):
+        """Тестирует поиск несуществующего пассажира по паспорту.
+        
+        Проверяет, что поиск по несуществующему номеру возвращает 404.
+        """
+        with pytest.raises(HTTPException) as exc:
+            find_passenger_by_passport("0000-000000", db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_find_by_name(self, db_session, fake_passenger_data):
+        """Тестирует поиск пассажиров по фамилии.
+        
+        Проверяет, что поиск по фамилии возвращает соответствующих пассажиров.
+        """
+        fake_passenger_data["fullName"] = "Иванов Иван"
+        create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        assert len(find_passengers_by_name("Иванов", db_session)) == 1
+
+    def test_update_success(self, db_session, fake_passenger_data):
+        """Тестирует успешное обновление данных пассажира.
+        
+        Проверяет, что имя пассажира обновляется корректно.
+        """
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        upd = update_passenger(p.id, PassengerUpdate(fullName="New Name"), db_session)
+        assert upd.full_name == "New Name"
+
+    def test_update_not_found(self, db_session, max_passenger_id):
+        """Тестирует обновление несуществующего пассажира.
+        
+        Проверяет, что попытка обновления несуществующего ID возвращает None.
+        """
+        assert update_passenger(max_passenger_id, PassengerUpdate(fullName="X"), db_session) is None
+
+    def test_delete_success(self, db_session, fake_passenger_data):
+        """Тестирует успешное удаление пассажира.
+        
+        Проверяет, что после удаления пассажир больше не находится по ID.
+        """
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        delete_passenger(p.id, db_session)
+        with pytest.raises(HTTPException):
+            get_passenger_by_id(p.id, db_session)
+
+    def test_delete_not_found(self, db_session, max_passenger_id):
+        """Тестирует удаление несуществующего пассажира.
+        
+        Проверяет, что попытка удаления несуществующего ID возвращает 404.
+        """
+        with pytest.raises(HTTPException) as exc:
+            delete_passenger(max_passenger_id, db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+</file>
+
+<file path="tests/api/controllers/test_user_controller.py">
+# tests/api/controllers/test_user_controller.py
+"""
+Тесты для контроллера пользователей (UserController).
+
+Проверяет:
+- Создание пользователя (успешно и дубликат)
+- Аутентификацию пользователя (правильный/неправильный пароль)
+- Получение списка всех пользователей
+- Обновление роли пользователя (успешно, недопустимая роль, не найден)
+"""
+import pytest
+from fastapi import HTTPException, status
+from app.controllers.user_controller import create_user, authenticate_user, get_all_users, update_user_role
+from app.schemas.user_schema import UserCreate
+
+
+@pytest.mark.usefixtures("db_session")
+class TestUserController:
+    """Набор тестов для функциональности контроллера пользователей."""
+
+    def test_create_success(self, db_session, fake_user_data):
+        """
+        Тестирует успешное создание пользователя.
+        
+        Проверяет, что новый пользователь создаётся с ролью "guest" по умолчанию.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Роль созданного пользователя равна "guest".
+        """
+        u = create_user(UserCreate(**fake_user_data), db_session)
+        assert u.role == "guest"
+
+    def test_create_duplicate(self, db_session, fake_user_data):
+        """
+        Тестирует создание пользователя с дублирующимся именем (ошибка 400).
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Вызывается HTTPException с сообщением о существовании пользователя.
+        """
+        create_user(UserCreate(**fake_user_data), db_session)
+        with pytest.raises(HTTPException) as exc:
+            create_user(UserCreate(**fake_user_data), db_session)
+        assert "уже существует" in exc.value.detail
+
+    def test_auth_success(self, db_session, fake_user_data):
+        """
+        Тестирует успешную аутентификацию пользователя.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Ответ содержит access_token.
+        """
+        create_user(UserCreate(**fake_user_data), db_session)
+        tokens = authenticate_user(fake_user_data["username"], fake_user_data["password"], db_session)
+        assert "access_token" in tokens
+
+    def test_auth_wrong_pass(self, db_session, fake_user_data):
+        """
+        Тестирует аутентификацию с неправильным паролем (ошибка 401).
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 401 UNAUTHORIZED.
+        """
+        create_user(UserCreate(**fake_user_data), db_session)
+        with pytest.raises(HTTPException) as exc:
+            authenticate_user(fake_user_data["username"], "WrongPass1!", db_session)
+        assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_all(self, db_session, fake_user_data):
+        """
+        Тестирует получение списка всех пользователей.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Список содержит как минимум одного пользователя.
+        """
+        create_user(UserCreate(**fake_user_data), db_session)
+        assert len(get_all_users(db_session)) >= 1
+
+    def test_update_role_success(self, db_session, fake_user_data):
+        """
+        Тестирует успешное обновление роли пользователя.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Роль пользователя изменена на "dispatcher".
+        """
+        u = create_user(UserCreate(**fake_user_data), db_session)
+        upd = update_user_role(u.id, "dispatcher", db_session)
+        assert upd.role == "dispatcher"
+
+    def test_update_role_invalid(self, db_session, fake_user_data):
+        """
+        Тестирует обновление роли на недопустимое значение (ошибка 400).
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_user_data: Фикстура с данными пользователя.
+            
+        Asserts:
+            - Вызывается HTTPException с сообщением о недопустимой роли.
+        """
+        u = create_user(UserCreate(**fake_user_data), db_session)
+        with pytest.raises(HTTPException) as exc:
+            update_user_role(u.id, "super_admin", db_session)
+        assert "Недопустимая роль" in exc.value.detail
+
+    def test_update_role_not_found(self, db_session, max_user_id):
+        """
+        Тестирует обновление роли несуществующего пользователя (ошибка 404).
+        
+        Args:
+            db_session: Сессия базы данных.
+            max_user_id: Следующий доступный ID (несуществующий).
+            
+        Asserts:
+            - Вызывается HTTPException со статусом 404 NOT FOUND.
+        """
+        with pytest.raises(HTTPException) as exc:
+            update_user_role(max_user_id, "admin", db_session)
+        assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+</file>
+
+<file path="tests/api/rourters/__init__.py">
+"""Тесты для роутеров API.
+
+Содержит интеграционные тесты для:
+- test_auth_integration - аутентификация и авторизация
+- test_v2_features - расширенные функции API v2
+- test_v1_v2_comparsion - сравнение версий API
+"""
+</file>
+
+<file path="tests/api/rourters/test_auth_integration.py">
+"""Тесты интеграции аутентификации.
+
+Проверяют полный цикл аутентификации: регистрация, вход, получение токенов,
+ролевой доступ и выход из системы.
+"""
+import pytest
+from fastapi import status
+
+
+class TestAuthIntegration:
+    """Набор тестов для проверки интеграции системы аутентификации."""
+
+    def test_register_and_login_flow(self, client, fake_user_data):
+        """Тестирует полный цикл регистрации и входа пользователя.
+        
+        Проверяет:
+        - Успешную регистрацию нового пользователя (201)
+        - Успешный вход с получением access_token (200)
+        """
+        reg = client.post("/api/v2/auth/register", json=fake_user_data)
+        assert reg.status_code == status.HTTP_201_CREATED
+
+        login = client.post("/api/v2/auth/login", json=fake_user_data)
+        assert login.status_code == status.HTTP_200_OK
+        assert "access_token" in login.json()
+
+    def test_login_invalid_creds(self, client, fake_user_data):
+        """Тестирует вход с неверными учетными данными.
+        
+        Проверяет, что попытка входа с неправильным паролем возвращает 401.
+        """
+        client.post("/api/v2/auth/register", json=fake_user_data)
+        login = client.post("/api/v2/auth/login", json={**fake_user_data, "password": "Wrong!"})
+        assert login.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_me_unauthorized(self, client):
+        """Тестирует доступ к профилю без авторизации.
+        
+        Проверяет, что запрос /me без токена возвращает 401.
+        """
+        assert client.get("/api/v2/auth/me").status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_role_based_access_v2(self, client, guest_token, fake_airport_data):
+        """Тестирует ролевой доступ к API v2.
+        
+        Проверяет, что пользователь с ролью 'guest' не может создавать аэропорты (403).
+        """
+        headers = {"Authorization": f"Bearer {guest_token}"}
+        res = client.post("/api/v2/airports", json=fake_airport_data, headers=headers)
+        assert res.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_refresh_invalid_token(self, client):
+        """Тестирует обновление сессии с невалидным refresh_token.
+        
+        Проверяет, что некорректный токен возвращает 401 или 422.
+        """
+        res = client.post("/api/v2/auth/refresh", params={"refresh_token": "invalid"})
+        assert res.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_logout_clears_cookie(self, client, fake_user_data):
+        """Тестирует выход из системы и очистку cookie.
+        
+        Проверяет:
+        - Успешный вход после регистрации
+        - Успешный logout (200)
+        """
+        client.post("/api/v2/auth/register", json=fake_user_data)
+        login_res = client.post("/api/v2/auth/login", json=fake_user_data)
+        assert login_res.status_code == 200
+
+        logout_res = client.post("/api/v2/auth/logout")
+        assert logout_res.status_code == 200
+</file>
+
+<file path="tests/api/rourters/test_v1_v2_comparsion.py">
+"""Тесты сравнения версий API v1 и v2.
+
+Проверяют различия в структуре ответов и функциональности между версиями API.
+"""
+import pytest
+
+
+class TestV1VsV2Comparison:
+    """Набор тестов для сравнения функциональности API v1 и v2."""
+
+    def test_list_structure_difference(self, client, admin_token, fake_airport_data):
+        """Тестирует различия в структуре ответов между v1 и v2.
+        
+        Проверяет:
+        - V1 возвращает Page[AirportResponse] (fastapi-pagination)
+        - V2 возвращает Page с поиском и сортировкой, содержит items и total
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        client.post("/api/v2/airports", json=fake_airport_data, headers=headers)
+
+        # V1 возвращает Page[AirportResponse] (fastapi-pagination)
+        res_v1 = client.get("/api/v1/airports", headers=headers)
+        assert res_v1.status_code == 200
+
+        # V2 возвращает Page с поиском и сортировкой
+        res_v2 = client.get("/api/v2/airports?page=1&size=1", headers=headers)
+        assert res_v2.status_code == 200
+        data = res_v2.json()
+        assert "items" in data and "total" in data
+
+    def test_search_feature_v2(self, client, admin_token, fake_airport_data):
+        """Тестирует функцию поиска, доступную только в API v2.
+        
+        Проверяет, что поиск по названию аэропорта возвращает результаты.
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        client.post("/api/v2/airports", json=fake_airport_data, headers=headers)
+
+        res = client.get(f"/api/v2/airports?search={fake_airport_data['name'][:4]}", headers=headers)
+        assert res.status_code == 200
+        assert len(res.json()["items"]) >= 1
+
+    def test_sorting_v2(self, client, admin_token, fake_airport_data):
+        """Тестирует функцию сортировки, доступную только в API v2.
+        
+        Проверяет сортировку аэропортов по имени в убывающем порядке.
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        for i in range(2):
+            data = fake_airport_data.copy()
+            data["icaoCode"] = f"SORT{i:02d}"
+            data["name"] = f"City {i}"
+            client.post("/api/v2/airports", json=data, headers=headers)
+
+        res = client.get("/api/v2/airports?sort_by=name&order=desc", headers=headers)
+        assert res.status_code == 200
+</file>
+
+<file path="tests/api/rourters/test_v2_features.py">
+"""Тесты расширенных функций API v2.
+
+Проверяют продвинутые возможности версии 2 API: поиск, сортировка,
+бронирование и отмена билетов.
+"""
+# tests/api/rourters/test_v2_features.py
+import pytest
+from fastapi import status
+
+
+@pytest.mark.usefixtures("db_session")
+class TestV2AdvancedFeatures:
+    """Набор тестов для проверки расширенных функций API v2."""
+
+    def test_airport_search_and_sort(self, client, admin_token):
+        """Тестирует поиск и сортировку аэропортов в API v2.
+        
+        Проверяет:
+        - Создание двух аэропортов с валидными ICAO-кодами
+        - Сортировку по имени в возрастающем порядке
+        - Корректную структуру ответа с items
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        # ✅ Используем только валидные ICAO-коды из VALID_ICAO_PREFIXES
+        ap1 = {"icaoCode": "AGEE", "name": "Sheremetyevo Intl"}
+        ap2 = {"icaoCode": "AGDD", "name": "Vnukovo Intl"}
+
+        r1 = client.post("/api/v2/airports", json=ap1, headers=headers)
+        assert r1.status_code == 201, f"Создание 1: {r1.text}"
+        r2 = client.post("/api/v2/airports", json=ap2, headers=headers)
+        assert r2.status_code == 201, f"Создание 2: {r2.text}"
+
+        res = client.get("/api/v2/airports?sort_by=name&order=asc", headers=headers)
+        data = res.json()
+        assert res.status_code == 200
+        assert len(data["items"]) >= 2
+        # Проверка сортировки по имени (Sheremetyevo < Vnukovo)
+        assert data["items"][0]["name"] == "Sheremetyevo Intl"
+
+    def test_booking_sell_and_list(self, client, admin_token, fake_passenger_data):
+        """Тестирует продажу и отмену бронирования через API v2.
+        
+        Проверяет полный цикл:
+        - Создание авиакомпании
+        - Создание аэропортов вылета и прибытия
+        - Создание рейса
+        - Создание пассажира
+        - Продажа билета (201)
+        - Отмена бронирования (204)
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+
+        # 1. Создаем авиакомпанию
+        res_al = client.post("/api/v2/airlines", json={"code": "TST", "name": "Test Air"}, headers=headers)
+        assert res_al.status_code == 201, f"Airline: {res_al.text}"
+
+        # 2. Создаем аэропорты с ВАЛИДНЫМИ ICAO-кодами
+        dep_icao = "AGDD"
+        arr_icao = "AGEE"
+
+        res_dep = client.post("/api/v2/airports", json={"icaoCode": dep_icao, "name": "Departure Test"},
+                              headers=headers)
+        assert res_dep.status_code == 201, f"Dep Airport: {res_dep.text}"
+
+        res_arr = client.post("/api/v2/airports", json={"icaoCode": arr_icao, "name": "Arrival Test"}, headers=headers)
+        assert res_arr.status_code == 201, f"Arr Airport: {res_arr.text}"
+
+        # 3. Создаем рейс, ссылаясь на созданные ICAO-коды
+        f_res = client.post("/api/v2/flights", json={
+            "flightNumber": "TST-001",
+            "airlineCode": "TST",
+            "departureAirportIcao": dep_icao,
+            "arrivalAirportIcao": arr_icao,
+            "departureDate": "2026-12-12",
+            "departureTime": "10:00:00",
+            "totalSeats": 10,
+            "freeSeats": 10
+        }, headers=headers)
+        assert f_res.status_code == 201, f"Flight: {f_res.text}"
+        flight = f_res.json()
+
+        # 4. Создаем пассажира
+        p_res = client.post("/api/v2/passengers", json=fake_passenger_data, headers=headers)
+        assert p_res.status_code == 201, f"Passenger: {p_res.text}"
+        passenger = p_res.json()
+
+        # 5. Оформляем бронирование
+        res = client.post("/api/v2/bookings",
+                          json={"flightId": flight["id"], "passengerIds": [passenger["id"]]},
+                          headers=headers)
+        assert res.status_code == 201, f"Booking: {res.text}"
+
+        # 6. Отменяем бронирование (покрывает DELETE v2 и логику возврата мест)
+        booking_id = res.json()[0]["id"]
+        cancel_res = client.delete(f"/api/v2/bookings/{booking_id}", headers=headers)
+        assert cancel_res.status_code == 204
+</file>
+
+<file path="tests/api/test_security.py">
+# tests/api/test_security.py
+"""
+Тесты для проверки функций безопасности и работы с токенами.
+
+Проверяет:
+- Хеширование и верификацию паролей
+- Создание и декодирование JWT токенов (access/refresh)
+- Обработку невалидных и истёкших токенов
+- Проверку ролей пользователей (admin_required, dispatcher_or_higher)
+"""
+import pytest
+from fastapi import HTTPException, status
+from app.core.security import (
+    hash_password, verify_password,
+    create_access_token, create_refresh_token, decode_token,
+    get_current_user, admin_required, dispatcher_or_higher
+)
+from app.models.user import User
+
+
+def test_hash_and_verify_password():
+    """
+    Тестирует функции хеширования и верификации паролей.
+    
+    Проверяет:
+    1. Пароль хешируется (хееш не равен исходному паролю)
+    2. Корректный пароль проходит верификацию
+    3. Некорректный пароль не проходит верификацию
+    """
+    password = "MySecureP@ss123"
+    hashed = hash_password(password)
+
+    assert hashed != password  # Пароль захеширован
+    assert verify_password(password, hashed)  # Проверка проходит
+    assert not verify_password("WrongPassword", hashed)  # Неправильный пароль не проходит
+
+
+def test_create_and_decode_access_token():
+    """
+    Тестирует создание и декодирование access токена.
+    
+    Проверяет:
+    1. Успешное создание токена
+    2. Корректное извлечение данных (sub) из токена
+    """
+    data = {"sub": "testuser", "role": "admin"}
+    token = create_access_token(data)
+
+    assert token is not None
+    username = decode_token(token, expected_type="access")
+    assert username == "testuser"
+
+
+def test_decode_wrong_token_type():
+    """
+    Тестирует обработку токена неправильного типа.
+    
+    Проверяет, что попытка декодировать access-токен как refresh
+    вызывает HTTPException со статусом 401.
+    """
+    access_token = create_access_token({"sub": "user"})
+
+    # Пытаемся декодировать access-токен как refresh
+    with pytest.raises(HTTPException) as exc:
+        decode_token(access_token, expected_type="refresh")
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_decode_expired_token():
+    """
+    Тестирует обработку истёкшего токена.
+    
+    Создаёт токен с отрицательным временем жизни (уже истёкший)
+    и проверяет, что decode_token возвращает None.
+    """
+    from datetime import timedelta
+    # Создаём токен с истёкшим сроком
+    token = create_access_token({"sub": "user"}, expires_delta=timedelta(seconds=-1))
+
+    result = decode_token(token)
+    assert result is None  # Истёкший токен не декодируется
+
+
+def test_decode_invalid_token():
+    """
+    Тестирует обработку невалидного токена.
+    
+    Проверяет, что декодирование строки, не являющейся JWT,
+    возвращает None.
+    """
+    result = decode_token("invalid.token.here")
+    assert result is None
+
+
+def test_get_current_user_invalid_token(db_session):
+    """
+    Тестирует получение текущего пользователя с невалидным токеном.
+    
+    Проверяет, что передача некорректного токена в get_current_user
+    вызывает HTTPException со статусом 401.
+    
+    Args:
+        db_session: Сессия базы данных.
+    """
+    from fastapi import Depends
+
+    with pytest.raises(HTTPException) as exc:
+        get_current_user(token="invalid_token", session=db_session)
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_admin_required_non_admin(db_session):
+    """
+    Тестирует декоратор admin_required для пользователя без роли admin.
+    
+    Создаёт пользователя с ролью "guest" и проверяет, что
+    admin_required вызывает HTTPException со статусом 403.
+    
+    Args:
+        db_session: Сессия базы данных.
+    """
+    user = User(username="guest_user", password=hash_password("pass"), role="guest")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    token = create_access_token({"sub": user.username})
+
+    with pytest.raises(HTTPException) as exc:
+        admin_required(user=get_current_user(token=token, session=db_session))
+    assert exc.value.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_dispatcher_or_higher_guest_denied(db_session):
+    """
+    Тестирует декоратор dispatcher_or_higher для пользователя с ролью guest.
+    
+    Проверяет, что пользователь с ролью "guest" не проходит проверку
+    и получает HTTPException со статусом 403.
+    
+    Args:
+        db_session: Сессия базы данных.
+    """
+    user = User(username="guest", password=hash_password("pass"), role="guest")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    token = create_access_token({"sub": user.username})
+
+    with pytest.raises(HTTPException) as exc:
+        dispatcher_or_higher(user=get_current_user(token=token, session=db_session))
+    assert exc.value.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_dispatcher_or_higher_dispatcher_allowed(db_session):
+    """
+    Тестирует декоратор dispatcher_or_higher для пользователя с ролью dispatcher.
+    
+    Проверяет, что пользователь с ролью "dispatcher" успешно проходит проверку.
+    
+    Args:
+        db_session: Сессия базы данных.
+        
+    Returns:
+        Asserts: Проверяет, что возвращённый пользователь имеет роль dispatcher.
+    """
+    user = User(username="dispatch", password=hash_password("pass"), role="dispatcher")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    token = create_access_token({"sub": user.username})
+    result = dispatcher_or_higher(user=get_current_user(token=token, session=db_session))
+
+    assert result.role == "dispatcher"
+</file>
+
+<file path="app/controllers/passenger_controller.py">
+from sqlmodel import Session, select
+from fastapi import HTTPException, status
+from app.models.passenger import Passenger
+from app.schemas.passenger_schema import PassengerCreate, PassengerUpdate
+from typing import List
+
+
+def create_passenger(data: PassengerCreate, session: Session) -> Passenger:
+    """Создание пассажира"""
+    existing = session.exec(
+        select(Passenger).where(Passenger.passport_number == data.passportNumber)
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Пассажир с таким паспортом уже зарегистрирован"
+        )
+
+    passenger = Passenger(
+        passport_number=data.passportNumber,
+        passport_issued_by=data.passportIssuedBy,
+        passport_issue_date=data.passportIssueDate,
+        full_name=data.fullName,
+        birth_date=data.birthDate
+    )
+    session.add(passenger)
+    session.commit()
+    session.refresh(passenger)
+    return passenger
+
+
+def get_all_passengers(session: Session) -> List[Passenger]:
+    """Получение всех пассажиров"""
+    return session.exec(select(Passenger)).all()
+
+
+def get_passenger_by_id(passenger_id: int, session: Session) -> Passenger:
+    """Получение пассажира по ID"""
+    passenger = session.get(Passenger, passenger_id)
+    if not passenger:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пассажир не найден"
+        )
+    return passenger
+
+
+def find_passenger_by_passport(passport: str, session: Session) -> Passenger:
+    """Поиск пассажира по паспорту"""
+    passenger = session.exec(
+        select(Passenger).where(Passenger.passport_number == passport)
+    ).first()
+
+    if not passenger:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пассажир не найден"
+        )
+    return passenger
+
+
+def find_passengers_by_name(name: str, session: Session) -> List[Passenger]:
+    """Поиск пассажиров по имени"""
+    passengers = session.exec(
+        select(Passenger).where(Passenger.full_name.contains(name))
+    ).all()
+    return passengers
+
+
+def delete_passenger(passenger_id: int, session: Session):
+    """Удаление пассажира"""
+    passenger = session.get(Passenger, passenger_id)
+    if not passenger:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пассажир не найден"
+        )
+
+    session.delete(passenger)
+    session.commit()
+
+def update_passenger(passenger_id: int, data: PassengerUpdate, session: Session) -> Passenger:
+    """Обновление данных пассажира по ID."""
+    passenger = session.get(Passenger, passenger_id)
+    if not passenger:
+        # Возвращаем None, чтобы эндпоинт мог обработать 404 ошибку
+        return None
+
+    # Преобразуем данные из Pydantic-схемы в словарь, исключая незаполненные поля
+    update_data = data.model_dump(exclude_unset=True)
+
+    # Преобразуем ключи из camelCase в snake_case для соответствия атрибутам модели SQLModel
+    snake_case_update_data = {}
+    for key, value in update_data.items():
+        # Простое преобразование camelCase в snake_case
+        # Например: passportNumber -> passport_number
+        snake_key = ''.join(['_' + c.lower() if c.isupper() else c for c in key]).lstrip('_')
+        snake_case_update_data[snake_key] = value
+
+    # Обновляем атрибуты пассажира
+    for key, value in snake_case_update_data.items():
+        setattr(passenger, key, value)
+
+    session.add(passenger)
+    session.commit()
+    session.refresh(passenger)
+    return passenger
+</file>
+
+<file path="app/db/database.py">
+from sqlmodel import SQLModel, create_engine
+from app.models.flight import Flight
+from app.models.booking import Booking
+from app.models.passenger import Passenger
+from app.models.user import User
+from app.models.airport import Airport
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, echo=True)
+
+
+def init_db():
+    """Инициализация базы данных"""
+    SQLModel.metadata.create_all(engine)
+
+
+def close_db():
+    """Закрытие соединения с БД"""
+    engine.dispose()
+
+
+def get_engine():
+    """Получение engine для миграций"""
+    return engine
+</file>
+
+<file path="app/schemas/passenger_schema.py">
+from pydantic import BaseModel, Field, field_validator
+from datetime import date
+from typing import Optional
+import re
+
+
+class PassengerCreate(BaseModel):
+    """Схема создания пассажира"""
+    passportNumber: str = Field(..., description="Номер паспорта NNNN-NNNNNN", examples=["1111-111111"])
+    passportIssuedBy: str = Field(..., max_length=200)
+    passportIssueDate: date
+    fullName: str = Field(..., max_length=200)
+    birthDate: date
+
+    @field_validator('passportNumber')
+    def validate_passport(cls, v):
+        pattern = r'^\d{4}-\d{6}$'
+        if not re.match(pattern, v):
+            raise ValueError('Номер паспорта должен быть в формате NNNN-NNNNNN')
+        return v
+
+
+class PassengerUpdate(BaseModel):
+    """Схема обновления пассажира"""
+    passportNumber: Optional[str] = None
+    passportIssuedBy: Optional[str] = None
+    passportIssueDate: Optional[date] = None
+    fullName: Optional[str] = None
+    birthDate: Optional[date] = None
+
+
+class PassengerResponse(BaseModel):
+    """Схема ответа с данными пассажира"""
+    id: int
+    passportNumber: str = Field(alias="passport_number")
+    passportIssuedBy: str = Field(alias="passport_issued_by")
+    passportIssueDate: date = Field(alias="passport_issue_date")
+    fullName: str = Field(alias="full_name")
+    birthDate: date = Field(alias="birth_date")
+</file>
+
+<file path="requirements.txt">
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlmodel==0.0.14
+python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0
+passlib[argon2]==1.7.4
+argon2-cffi==23.1.0
+python-multipart==0.0.6
+email-validator==2.1.0
+fastapi-pagination==0.12.13
+psycopg2
+pytest>=7.0.0
+httpx>=0.25.0,<0.27.0 # Ограничиваем версию httpx
+pytest-asyncio>=0.21.0
+faker>=18.0.0
+</file>
+
+<file path="tests/api/controllers/test_booking_controller.py">
+"""Тесты для контроллера бронирований.
+
+Проверяют продажу и отмену билетов, работу с пересадками и обработку ошибок.
+"""
+import pytest
+from fastapi import HTTPException
+from app.controllers.booking_controller import sell_ticket, cancel_ticket, get_bookings_by_flight, get_bookings_by_passenger
+from app.schemas.booking_schema import BookingCreate
+from app.controllers.flight_controller import create_flight
+from app.controllers.passenger_controller import create_passenger
+from app.schemas.flight_schema import FlightCreate
+from app.schemas.passenger_schema import PassengerCreate
+from tests.conftest import fake
+
+
+@pytest.mark.usefixtures("db_session")
+class TestBookingController:
+    """Набор тестов для проверки функциональности booking_controller."""
+
+    def setup_infra(self, db_session, fake_flight_data, fake_passenger_data):
+        """Создает тестовые данные: рейс и пассажира.
+        
+        Args:
+            db_session: Сессия базы данных.
+            fake_flight_data: Данные для создания рейса.
+            fake_passenger_data: Данные для создания пассажира.
+            
+        Returns:
+            Кортеж (flight, passenger) - созданные объекты.
+        """
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        return f, p
+
+    def test_sell_success(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует успешную продажу билета.
+        
+        Проверяет, что бронирование создается корректно.
+        """
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        res = sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+        assert len(res) == 1
+        # Проверяем, что место назначено
+        assert res[0].seat is not None and res[0].seat != ""
+
+    def test_sell_no_seats(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует ошибку при продаже билета на рейс без мест.
+        
+        Проверяет, что попытка продажи при отсутствии мест вызывает HTTPException.
+        """
+        fake_flight_data["freeSeats"] = 0
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        with pytest.raises(HTTPException) as exc:
+            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+        assert "Недостаточно мест" in exc.value.detail
+
+    def test_sell_duplicate(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует защиту от повторной продажи билета тому же пассажиру.
+        
+        Проверяет, что попытка продать билет повторно вызывает HTTPException.
+        """
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+        with pytest.raises(HTTPException) as exc:
+            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+        assert "уже куплен" in exc.value.detail.lower()
+
+    def test_sell_with_custom_seats(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует продажу билетов с указанием конкретных мест."""
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        res = sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id], seats=["1A"]), db_session)
+        assert len(res) == 1
+        assert res[0].seat == "1A"
+
+    def test_sell_seat_occupied(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует ошибку при попытке занять уже занятое место."""
+        from app.controllers.passenger_controller import create_passenger
+        from app.schemas.passenger_schema import PassengerCreate
+        
+        f, p1 = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        # Бронируем место 1A для первого пассажира
+        sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p1.id], seats=["1A"]), db_session)
+        
+        # Создаем второго пассажира
+        p2 = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        
+        # Пытаемся забронировать то же место
+        with pytest.raises(HTTPException) as exc:
+            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p2.id], seats=["1A"]), db_session)
+        assert "уже занято" in exc.value.detail.lower()
+
+    def test_cancel_success(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует успешную отмену бронирования.
+        
+        Проверяет, что после отмены количество мест восстанавливается.
+        """
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        initial = f.free_seats
+        b = sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)[0]
+        cancel_ticket(b.id, db_session)
+        db_session.refresh(f)
+        # После продажи и отмены количество мест должно вернуться к ИСХОДНОМУ, а не initial + 1
+        assert f.free_seats == initial
+
+    def test_get_by_flight(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует получение списка бронирований по рейсу.
+        
+        Проверяет, что возвращается корректное количество бронирований.
+        """
+        f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+        assert len(get_bookings_by_flight(f.id, db_session)) == 1
+
+    def test_sell_ticket_with_connections(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует продажу билета с пересадкой.
+        
+        Проверяет создание основного бронирования и бронирования пересадки.
+        Покрывает строки 39-52 в booking_controller.py.
+        """
+        from app.schemas.flight_schema import FlightCreate
+        from app.schemas.booking_schema import BookingCreate
+        from app.controllers.flight_controller import create_flight
+        from app.controllers.passenger_controller import create_passenger
+        from app.controllers.booking_controller import sell_ticket
+
+        # 1. Создаем основной рейс
+        f1 = create_flight(FlightCreate(**fake_flight_data), db_session)
+
+        # 2. Создаем рейс пересадки
+        # Важно: flightNumber должен быть уникальным и соответствовать airlineCode
+        f2_data = fake_flight_data.copy()
+        f2_data["flightNumber"] = f"{fake_flight_data['airlineCode']}-999"
+
+        # Создаем второй рейс
+        f2 = create_flight(FlightCreate(**f2_data), db_session)
+
+        # 3. Создаем пассажира
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+
+        # 4. Продаем билет с пересадкой
+        # Передаем ID основного рейса и список ID рейсов пересадки
+        bookings = sell_ticket(
+            BookingCreate(flightId=f1.id, passengerIds=[p.id], connectionFlightIds=[f2.id]),
+            db_session
+        )
+
+        # Проверяем, что создалось 2 бронирования (основное + пересадка)
+        assert len(bookings) == 2
+
+        # Проверяем, что место списалось на рейсе пересадки
+        db_session.refresh(f2)
+        assert f2.free_seats == 49
+
+    def test_sell_ticket_flight_not_found(self, db_session, fake_passenger_data, max_flight_id):
+        """Тестирует ошибку при продаже билета на несуществующий рейс.
+        
+        Проверяет, что запрос несуществующего рейса возвращает 404.
+        Покрывает строку 24 в booking_controller.py.
+        """
+        from app.schemas.booking_schema import BookingCreate
+        with pytest.raises(HTTPException) as exc:
+            sell_ticket(BookingCreate(flightId=max_flight_id, passengerIds=[1]), db_session)
+        assert exc.value.status_code == 404
+
+    def test_add_connections_success(self, db_session, fake_flight_data, fake_passenger_data):
+        """Тестирует добавление пересадки к существующему бронированию.
+        
+        Проверяет, что пересадка успешно добавляется к бронированию.
+        Покрывает строки 79-115 в booking_controller.py.
+        """
+        from app.schemas.flight_schema import FlightCreate
+        from app.schemas.booking_schema import BookingCreate
+        from app.controllers.booking_controller import add_connections_to_booking
+
+        f = create_flight(FlightCreate(**fake_flight_data), db_session)
+        p = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        b = sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)[0]
+
+        # ✅ ИСПРАВЛЕНО: Валидный номер рейса пересадки
+        f2_data = fake_flight_data.copy()
+        f2_data["flightNumber"] = f"{fake_flight_data['airlineCode']}-888"
+        f2 = create_flight(FlightCreate(**f2_data), db_session)
+
+        res = add_connections_to_booking(b.booking_code, [f2.id], db_session)
+        assert len(res) == 1
+</file>
+
+<file path="app/api/v2/booking_router.py">
+from typing import List
+
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlmodel import Session, select
+from app.db.session import get_session
+from app.models.booking import Booking, generate_booking_code
+from app.models.flight import Flight
+from app.models.passenger import Passenger
+from app.schemas.booking_schema import BookingCreate, BookingResponse
+from app.core.security import dispatcher_or_higher, get_current_user, admin_required
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+
+router = APIRouter()
+
+
+@router.get("", response_model=Page[BookingResponse])
+def list_bookings(
+        session: Session = Depends(get_session),
+        flight_id: int = Query(None),
+        passenger_id: int = Query(None),
+        _=Depends(get_current_user)
+):
+    query = select(Booking)
+    if flight_id:
+        query = query.where(Booking.flight_id == flight_id)
+    if passenger_id:
+        query = query.where(Booking.passenger_id == passenger_id)
+
+    return paginate(session, query.order_by(Booking.created_at.desc()))
+
+
+@router.post("", response_model=list[BookingResponse], status_code=status.HTTP_201_CREATED)
+def create_bookings(
+        data: BookingCreate,
+        session: Session = Depends(get_session),
+        _=Depends(dispatcher_or_higher)
+):
+    from app.controllers.booking_controller import sell_ticket as controller_sell_ticket
+    # Используем контроллер для продажи билетов с проверкой мест
+    bookings = controller_sell_ticket(data, session)
+    return bookings
+
+
+@router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_booking(booking_id: int, session: Session = Depends(get_session), _=Depends(admin_required)):
+    booking = session.get(Booking, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Бронирование не найдено")
+
+    flight = session.get(Flight, booking.flight_id)
+    if flight:
+        flight.free_seats += 1
+        session.add(flight)
+
+    session.delete(booking)
+    session.commit()
+
+
+@router.get("/by-flight/{flight_id}", response_model=List[BookingResponse])
+def get_flight_bookings(flight_id: int, session: Session = Depends(get_session), _=Depends(dispatcher_or_higher)):
+    bookings = session.exec(select(Booking).where(Booking.flight_id == flight_id)).all()
+    return bookings
+
+
+@router.get("/by-passenger/{passport}", response_model=List[BookingResponse])
+def get_passenger_bookings(passport: str, session: Session = Depends(get_session), _=Depends(get_current_user)):
+    from app.models.passenger import Passenger
+    p = session.exec(select(Passenger).where(Passenger.passport_number == passport)).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Пассажир не найден")
+    return session.exec(select(Booking).where(Booking.passenger_id == p.id)).all()
+</file>
+
+<file path="app/api/v2/flight_router.py">
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlmodel import Session, select
+from datetime import date
+from app.db.session import get_session
+from app.models.flight import Flight
+from app.schemas.flight_schema import FlightCreate, FlightResponse
+from app.core.security import admin_required, get_current_user
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+
+router = APIRouter()
+
+
+@router.get("", response_model=Page[FlightResponse])
+def list_flights(session: Session = Depends(get_session), _=Depends(get_current_user)):
+    return paginate(session, select(Flight).order_by(Flight.departure_date))
+
+
+@router.post("", response_model=FlightResponse, status_code=status.HTTP_201_CREATED)
+def create_flight(data: FlightCreate, session: Session = Depends(get_session), _=Depends(admin_required)):
+    # Проверяем существование зависимостей
+    from app.models.airline import Airline
+    from app.models.airport import Airport
+    from sqlmodel import select
+    
+    airline = session.exec(select(Airline).where(Airline.code == data.airlineCode.upper())).first()
+    if not airline:
+        raise HTTPException(status_code=400, detail="Авиакомпания не найдена")
+    
+    dep_airport = session.exec(select(Airport).where(Airport.icao_code == data.departureAirportIcao.upper())).first()
+    if not dep_airport:
+        raise HTTPException(status_code=400, detail="Аэропорт отправления не найден")
+    
+    arr_airport = session.exec(select(Airport).where(Airport.icao_code == data.arrivalAirportIcao.upper())).first()
+    if not arr_airport:
+        raise HTTPException(status_code=400, detail="Аэропорт прибытия не найден")
+    
+    if dep_airport.icao_code == arr_airport.icao_code:
+        raise HTTPException(status_code=400, detail="Аэропорты отправления и прибытия не могут совпадать")
+    
+    flight = Flight(
+        flight_number=data.flightNumber,
+        airline_code=data.airlineCode,
+        departure_airport_icao=data.departureAirportIcao,
+        arrival_airport_icao=data.arrivalAirportIcao,
+        departure_date=data.departureDate,
+        departure_time=data.departureTime,
+        arrival_time=data.arrivalTime,
+        total_seats=data.totalSeats,
+        free_seats=data.totalSeats  # ✅ Всегда устанавливаем максимальное количество
+    )
+    session.add(flight)
+    session.commit()
+    session.refresh(flight)
+    return flight
+
+@router.delete("/{flight_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_flight(flight_id: int, session: Session = Depends(get_session), _=Depends(admin_required)):
+    flight = session.get(Flight, flight_id)
+    if not flight:
+        raise HTTPException(status_code=404, detail="Рейс не найден")
+    session.delete(flight)
+    session.commit()
+</file>
+
+<file path="app/core/security.py">
+from datetime import datetime, timedelta, timezone
+from jose import jwt, JWTError
+from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlmodel import Session, select
+from typing import Optional
+
+from app.db.session import get_session
+from app.models.user import User
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# ИЗМЕНЕНО: используем HTTPBearer вместо OAuth2PasswordBearer
+security = HTTPBearer(auto_error=False)
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+def hash_password(password: str) -> str:
+    """Хеширование пароля"""
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Проверка пароля"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    """Создание JWT токена"""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(data: dict):
+    """Создание refresh токена"""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(days=7)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_token(token: str, expected_type: str = "access"):
+    """Декодирование токена с проверкой типа"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_type = payload.get("type")
+        if token_type != expected_type:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный тип токена"
+            )
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+
+async def get_token_from_header_or_cookie(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> str:
+    """
+    ИСПРАВЛЕНО: Получает токен из заголовка Authorization или из куки access_token.
+    Сначала проверяет заголовок, затем куки.
+    """
+    # Сначала пробуем получить токен из заголовка Authorization
+    if credentials:
+        return credentials.credentials
+
+    # Затем пробуем получить токен из куки
+    token_in_cookie = request.cookies.get("access_token")
+    if token_in_cookie:
+        return token_in_cookie
+
+    # Если ни в одном месте токен не найден, выбрасываем 401
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Токен не предоставлен ни в Authorization, ни в cookie 'access_token'",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def get_current_user(
+    token: str = Depends(get_token_from_header_or_cookie),
+    session: Session = Depends(get_session)
+):
+    """Получение текущего пользователя по токену"""
+    username = decode_token(token, expected_type="access")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Невалидный токен"
+        )
+
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Пользователь не найден"
+        )
+    return user
+
+
+def admin_required(user=Depends(get_current_user)):
+    """Проверка прав администратора"""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права администратора"
+        )
+    return user
+
+
+def dispatcher_or_higher(user = Depends(get_current_user)):
+    """Проверка, что пользователь авторизован и имеет роль dispatcher или выше (admin)."""
+    if user.role == "guest":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуется роль диспетчера или выше"
+        )
+    return user
+</file>
+
+<file path="app/schemas/user_schema.py">
+from pydantic import BaseModel, Field, field_validator
+from fastapi import Form
+import re
+
+
+class UserCreate(BaseModel):
+    """Схема создания пользователя"""
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8, examples=["string123!"])
+
+    @field_validator('password')
+    def password_complexity(cls, v):
+        pattern = r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+=-]).{8,}$'
+        if not re.match(pattern, v):
+            raise ValueError('Пароль должен содержать буквы, цифры и спецсимволы, длина больше 8')
+        return v
+
+
+class UserLogin(BaseModel):
+    """Схема авторизации"""
+    username: str
+    password: str
+
+    @classmethod
+    def as_form(
+        cls,
+        username: str = Form(..., description="Имя пользователя"),
+        password: str = Form(..., description="Пароль")
+    ):
+        return cls(username=username, password=password)
+
+
+class UserResponse(BaseModel):
+    """Схема ответа с данными пользователя"""
+    id: int
+    username: str
+    role: str
+
+
+# app/schemas/user_schema.py
+
+class TokenResponse(BaseModel):
+    """Схема ответа с токенами"""
+    access_token: str
+    refreshToken: str
+    tokenType: str = "bearer"
+
+# --- НОВАЯ СХЕМА ---
+class UserUpdateRole(BaseModel):
+    """Схема для обновления роли пользователя"""
+    role: str
+</file>
+
+<file path="readme.md">
+# Airport Dispatcher API
+
+REST API для АРМ диспетчера аэропорта.
+
+## Назначение
+
+Данный API предоставляет интерфейс для управления данными, связанными с авиарейсами, пассажирами и бронированием билетов. Он позволяет регистрировать пассажиров, управлять информацией о рейсах, продавать и отменять билеты, а также обеспечивает аутентификацию и авторизацию пользователей.
+
+## Технологии
+
+- **Язык программирования:** Python
+- **Фреймворк:** [FastAPI](https://fastapi.tiangolo.com/)
+- **ORM:** [SQLModel](https://sqlmodel.tiangolo.com/)
+- **База данных:** PostgreSQL (через `postgresql+psycopg2`)
+- **Аутентификация:** JWT (OAuth2 Password Bearer)
+- **Хеширование паролей:** `passlib` с `argon2`
+- **Пагинация:** `fastapi-pagination`
+- **Документация:** Swagger UI ( `/api/v1/docs` ), ReDoc ( `/api/v1/redoc` )
+
+## Установка зависимостей
+
+1.  Убедитесь, что у вас установлен Python 3.8+.
+2.  Рекомендуется создать виртуальное окружение:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    # или
+    # venv\Scripts\activate # Windows
+    ```
+3.  Установите зависимости:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Настройка базы данных и переменных окружения
+
+1.  Установите и запустите PostgreSQL.
+2.  Создайте базу данных (например, `airport_db`).
+3.  Создайте файл `.env` в корне проекта и укажите свои параметры подключения к базе данных и секретный ключ:
+
+    ```env
+    DATABASE_URL=postgresql+psycopg2://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:<DB_PORT>/<DB_NAME>
+    SECRET_KEY=your-super-secret-and-long-key-change-in-production
+    ALGORITHM=HS256
+    ACCESS_TOKEN_EXPIRE_MINUTES=30
+    ```
+
+    *Пример:*
+    ```env
+    DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/airport_db
+    SECRET_KEY=8a7c1f9e0b4d6f2a1c5e8f7a9b3c4d6e0f2a1c5e8f7a9b3c4d6e0f2a1c5e8f7a
+    ALGORITHM=HS256
+    ACCESS_TOKEN_EXPIRE_MINUTES=30
+    ```
+
+    **ВАЖНО:** Файл `.env` не должен быть закоммичен в репозиторий. Убедитесь, что он присутствует в `.gitignore`.
+
+## Запуск приложения
+
+После настройки базы данных и переменных окружения, запустите приложение с помощью Uvicorn:
+
+```bash
+uvicorn app.main:main_app --reload
+```
+
+## Заполнение базы данных тестовыми данными
+
+Для заполнения базы данных тестовыми данными (аэропортами, пассажирами, рейсами, бронированиями) можно воспользоваться вспомогательным скриптом `populate_db.py`.
+
+### Требования
+
+Перед запуском убедитесь, что:
+1.  База данных настроена и подключение указано в файле `.env`.
+2.  Виртуальное окружение активировано и зависимости установлены (`pip install -r requirements.txt`).
+
+### Запуск скрипта
+
+Скрипт принимает параметры командной строки для указания количества генерируемых записей.
+
+**Синтаксис:**
+```bash
+python -m app.utils.populate_db --airports N --passengers M --flights K --bookings L
+```
+
+где N, M, K, L - это количество элементов соответствующего типа, которое вы хотите сгенерировать (целые числа).
+</file>
+
+<file path="tests/api/test_auth.py">
+# tests/api/test_auth.py
+"""
+Тесты для проверки функциональности аутентификации и авторизации.
+
+Проверяет:
+- Регистрацию новых пользователей
+- Вход в систему (login)
+- Обработку неверных учётных данных
+- Контроль доступа на основе ролей (RBAC)
+"""
+import pytest
+from fastapi import status
+
+
+def test_register_and_login(client):
+    """
+    Тестирует полный цикл регистрации и входа пользователя.
+    
+    Проверяет:
+    1. Успешную регистрацию нового пользователя (статус 201)
+    2. Успешный вход с корректными учётными данными (статус 200)
+    3. Наличие access_token в ответе на login
+    
+    Args:
+        client: Тестовый HTTP клиент.
+    """
+    reg = client.post("/api/v1/auth/register", json={"username": "new_user", "password": "Pass1234!"})
+    assert reg.status_code == status.HTTP_201_CREATED
+
+    login = client.post("/api/v1/auth/login", json={"username": "new_user", "password": "Pass1234!"})
+    assert login.status_code == status.HTTP_200_OK
+    assert "access_token" in login.json()
+
+
+def test_invalid_password(client):
+    """
+    Тестирует отказ во входе при неверном пароле.
+    
+    Проверяет, что попытка входа с неправильным паролем
+    возвращает статус 401 UNAUTHORIZED.
+    
+    Args:
+        client: Тестовый HTTP клиент.
+    """
+    client.post("/api/v1/auth/register", json={"username": "u2", "password": "Pass1234!"})
+    res = client.post("/api/v1/auth/login", json={"username": "u2", "password": "Wrong!"})
+    assert res.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_role_based_access(client, guest_token):
+    """
+    Тестирует контроль доступа на основе ролей (RBAC).
+    
+    Проверяет, что пользователь с ролью "guest" не может
+    создавать аэропорты (требуется роль admin/dispatcher).
+    
+    Args:
+        client: Тестовый HTTP клиент.
+        guest_token: JWT токен пользователя с ролью guest.
+    """
+    headers = {"Authorization": f"Bearer {guest_token}"}
+    # Гость не должен создавать аэропорты
+    res = client.post("/api/v1/airports", json={"icaoCode": "UUWW", "name": "Test"}, headers=headers)
+    assert res.status_code == status.HTTP_403_FORBIDDEN
+
+def test():
+    pass
+</file>
+
+<file path="app/api/v1/passenger_router.py">
+from fastapi import APIRouter, Depends, status, HTTPException
+from sqlmodel import Session, select
+from typing import List
+
+from app.db.session import get_session
+from app.schemas.passenger_schema import (
+    PassengerCreate,
+    PassengerUpdate,
+    PassengerResponse,
+)
+from app.models.passenger import Passenger
+from app.controllers.passenger_controller import (
+    create_passenger as ctrl_create_passenger,
+    get_all_passengers as ctrl_get_all_passengers,
+    get_passenger_by_id as ctrl_get_passenger_by_id,
+    find_passenger_by_passport as ctrl_find_passenger_by_passport,
+    find_passengers_by_name as ctrl_find_passengers_by_name,
+    delete_passenger as ctrl_delete_passenger,
+    update_passenger as ctrl_update_passenger # Добавлен импорт
+)
+from app.core.security import get_current_user, admin_required, dispatcher_or_higher
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+
+router = APIRouter(prefix="", tags=["Пассажиры"])
+
+
+@router.post("", response_model=PassengerResponse, status_code=status.HTTP_201_CREATED)
+def create_passenger_endpoint(
+    data: PassengerCreate,
+    session: Session = Depends(get_session),
+    current_user = Depends(dispatcher_or_higher)
+):
+    passenger = ctrl_create_passenger(data, session)
+    return PassengerResponse.model_validate(passenger, from_attributes=True)
+
+
+@router.get("", response_model=Page[PassengerResponse]) # Используем Page для пагинации
+def get_passengers_endpoint(
+    session: Session = Depends(get_session),
+    current_user = Depends(dispatcher_or_higher)
+):
+    """Просмотр всех пассажиров с пагинацией."""
+    return paginate(session, select(Passenger))
+
+
+@router.get("/{passenger_id}", response_model=PassengerResponse, dependencies=[Depends(get_current_user)])
+def get_passenger_endpoint(
+    passenger_id: int,
+    session: Session = Depends(get_session),
+    current_user = Depends(dispatcher_or_higher)
+):
+    """Получение пассажира по ID."""
+    passenger = ctrl_get_passenger_by_id(passenger_id, session)
+    return PassengerResponse.model_validate(passenger, from_attributes=True)
+
+
+@router.get("/search/by-passport/{passport}", response_model=PassengerResponse)
+def search_passenger_by_passport_endpoint(
+    passport: str,
+    session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    """Поиск пассажира по серии и номеру паспорта."""
+    passenger = ctrl_find_passenger_by_passport(passport, session)
+    if not passenger:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пассажир не найден")
+    # Возвращаем объект модели, Pydantic сам сопоставит поля через alias и from_attributes
+    return PassengerResponse.model_validate(passenger, from_attributes=True)
+
+
+@router.get("/search/by-name/{name}", response_model=List[PassengerResponse])
+def search_passengers_by_name_endpoint(
+    name: str,
+    session: Session = Depends(get_session),
+    current_user = Depends(dispatcher_or_higher)
+):
+    """Поиск пассажиров по ФИО (частичное совпадение)."""
+    passengers = ctrl_find_passengers_by_name(name, session)
+    return [PassengerResponse.model_validate(p, from_attributes=True) for p in passengers]
+
+
+@router.put("/{passenger_id}", response_model=PassengerResponse, dependencies=[Depends(get_current_user)])
+def update_passenger_endpoint(
+    passenger_id: int,
+    data: PassengerUpdate, # <-- Убедитесь, что параметр называется 'data'
+    session: Session = Depends(get_session),
+    current_user = Depends(admin_required) # Аутентификация требуется
+):
+    """Обновление данных пассажира по ID."""
+    passenger = ctrl_update_passenger(passenger_id, data, session) # <-- Используем 'data'
+    if not passenger:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пассажир не найден")
+    return PassengerResponse.model_validate(passenger, from_attributes=True)
+
+
+@router.delete("/{passenger_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_passenger_endpoint(
+    passenger_id: int,
+    session: Session = Depends(get_session),
+    current_user = Depends(admin_required) # Требуется роль администратора
+):
+    """Удаление пассажира по ID (только для администратора)."""
+    success = ctrl_delete_passenger(passenger_id, session)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Пассажир не найден")
+    return
+</file>
+
+<file path="app/controllers/user_controller.py">
+from sqlmodel import Session, select
+from fastapi import HTTPException, status # Убедитесь, что импортированы
+from app.models.user import User
+from app.schemas.user_schema import UserCreate
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from typing import List
+
+
+def create_user(data: UserCreate, session: Session) -> User:
+    """Создание пользователя"""
+    existing_user = session.exec(select(User).where(User.username == data.username)).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Пользователь с таким именем уже существует"
+        )
+
+    user = User(
+        username=data.username,
+        password=hash_password(data.password),
+        role="guest"
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def authenticate_user(username: str, password: str, session: Session):
+    """Аутентификация пользователя"""
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user or not verify_password(password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверный логин или пароль"
+        )
+
+    access_token = create_access_token(data={"sub": user.username})
+    refresh_token = create_refresh_token(data={"sub": user.username})
+
+    return {
+
+        "access_token": access_token,
+        "refreshToken": refresh_token,
+        "tokenType": "bearer"
+    }
+
+
+def get_all_users(session: Session) -> List[User]:
+    """Получение всех пользователей"""
+    return session.exec(select(User)).all()
+
+# --- НОВАЯ ФУНКЦИЯ ---
+def update_user_role(user_id: int, new_role: str, session: Session) -> User:
+    """Обновление роли пользователя (только для администратора)"""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден"
+        )
+
+    # Проверка, что новая роль допустима (например, "dispatcher", "admin")
+    # Можно добавить список разрешённых ролей
+    allowed_roles = ["dispatcher", "admin", "guest"] # Пример списка
+    if new_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Недопустимая роль. Допустимые значения: {allowed_roles}"
+        )
+
+    user.role = new_role
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+</file>
+
+<file path="app/main.py">
+# app/main.py
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi_pagination import add_pagination
+from app.db.database import init_db, close_db
+
+# V1
+from app.api.v1 import auth_router as v1_auth, flight_router as v1_flight, passenger_router as v1_passenger
+from app.api.v1 import booking_router as v1_booking, airport_router as v1_airport, airline_router as v1_airline
+
+# V2
+from app.api.v2 import auth_router as v2_auth, flight_router as v2_flight, passenger_router as v2_passenger
+from app.api.v2 import booking_router as v2_booking, airport_router as v2_airport, airline_router as v2_airline
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+    close_db()
+
+# 🔥 Главное приложение — с отключёнными docs, чтобы не было каши
+main_app = FastAPI(
+    lifespan=lifespan,
+    title="Airport Dispatcher API",
+    docs_url=None,      # ❌ Отключаем /docs на корне
+    redoc_url=None
+)
+
+# === Единый app для v1 + v2 ===
+app = FastAPI(
+    title="API v1/v2",
+    version="2.0.0",
+    description="v1: legacy | v2: pagination, validation, filters",
+    lifespan=lifespan,
+    docs_url="/docs",        # ✅ Документация будет по /docs
+    openapi_url="/openapi.json"
+)
+
+# ✅ ВАЖНО: роутеры v1/v2 НЕ должны иметь собственного prefix="/auth" и т.п.
+# Иначе получится /api/v1/auth/auth
+
+# V1
+app.include_router(v1_auth.router, prefix="/api/v1/auth", tags=["v1: Auth"])
+app.include_router(v1_airport.router, prefix="/api/v1/airports", tags=["v1: Airports"])
+app.include_router(v1_airline.router, prefix="/api/v1/airlines", tags=["v1: Airlines"])
+app.include_router(v1_flight.router, prefix="/api/v1/flights", tags=["v1: Flights"])
+app.include_router(v1_passenger.router, prefix="/api/v1/passengers", tags=["v1: Passengers"])
+app.include_router(v1_booking.router, prefix="/api/v1/bookings", tags=["v1: Bookings"])
+
+# V2
+app.include_router(v2_auth.router, prefix="/api/v2/auth", tags=["v2: Auth"])
+app.include_router(v2_airport.router, prefix="/api/v2/airports", tags=["v2: Airports"])
+app.include_router(v2_airline.router, prefix="/api/v2/airlines", tags=["v2: Airlines"])
+app.include_router(v2_flight.router, prefix="/api/v2/flights", tags=["v2: Flights"])
+app.include_router(v2_passenger.router, prefix="/api/v2/passengers", tags=["v2: Passengers"])
+app.include_router(v2_booking.router, prefix="/api/v2/bookings", tags=["v2: Bookings"])
+
+# ✅ Обязательно добавляем пагинацию!
+add_pagination(app)
+
+# Монтируем app к main_app
+main_app.mount("/", app)
+
+@main_app.get("/")
+def root():
+    return {
+        "message": "Airport Dispatcher API Ready",
+        "docs": "/docs",  # Теперь /docs показывает ВСЕ роуты (v1 + v2)
+        "note": "Используй префиксы /api/v1/... или /api/v2/... в запросах"
+    }
+</file>
+
+<file path="app/models/booking.py">
+from sqlmodel import SQLModel, Field
+from typing import Optional
+from datetime import datetime
+from sqlalchemy import Column, Integer, ForeignKey
+
+def generate_booking_code(length=6):
+    import secrets
+    import string
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(chars) for _ in range(length))
+
+class Booking(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    booking_code: str
+    flight_id: int = Field(foreign_key="flight.id")
+    passenger_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("passenger.id", ondelete="CASCADE"))
+    )
+    seat: str = Field(default="", description="Номер места пассажира")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Новые поля для управления багажом
+    baggage_allowed: bool = Field(default=False, description="Возможность багажа")
+    payment_type: str = Field(default="card", description="Тип оплаты: card, cash, online")
+    additional_fees: float = Field(default=0.0, description="Дополнительные сборы")
+    class_type: str = Field(default="economy", description="Класс обслуживания: economy, business, first")
+    
+    @property
+    def final_price(self) -> float:
+        """Вычисляет финальную цену как сумму базовой цены рейса, цены багажа (если есть) и дополнительных сборов"""
+        return self.additional_fees
+</file>
+
+<file path="app/models/flight.py">
+from sqlmodel import SQLModel, Field
+from typing import Optional
+from datetime import date, time
+
+
+class Flight(SQLModel, table=True):
+    __tablename__ = "flight"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    flight_number: str = Field(unique=True, index=True)
+
+    airline_code: str = Field(max_length=3, foreign_key="airline.code")
+
+    departure_airport_icao: str = Field(foreign_key="airport.icao_code", max_length=4)
+    arrival_airport_icao: str = Field(foreign_key="airport.icao_code", max_length=4)
+    departure_date: date
+    departure_time: time
+    arrival_time: time
+    total_seats: int
+    free_seats: int
+    
+    # Поля для управления ценами
+    base_price: float = Field(default=0.0, description="Базовая цена билета")
+    baggage_price: float = Field(default=0.0, description="Цена багажа")
+</file>
+
+<file path="app/utils/populate_db.py">
+import sys
+import argparse
+from pathlib import Path
+from faker import Faker
+from sqlmodel import Session, select
+from app.db.database import engine
+from app.models.airport import Airport
+from app.models.passenger import Passenger
+from app.models.flight import Flight
+from app.models.booking import Booking, generate_booking_code
+from app.models.airline import Airline  # ✅ НОВОЕ
+from datetime import date, time, timedelta, datetime
+import random
+import re
+
+# Добавляем корень проекта, чтобы импорты работали при запуске напрямую
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+fake = Faker("ru_RU")
+Faker.seed(42)  # для воспроизводимости
+
+# --- Импортируем валидные префиксы из схемы (чтобы не дублировать) ---
+try:
+    from app.schemas.airport_schema import VALID_ICAO_PREFIXES
+except ImportError:
+    VALID_ICAO_PREFIXES = {"UU", "UW", "EV", "EP", "LT", "ED", "EG", "LF", "LE", "SK", "MM", "K"}
+
+
+def generate_icao_code() -> str:
+    prefix = random.choice(list(VALID_ICAO_PREFIXES))
+    suffix_len = 4 - len(prefix)
+    suffix = ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=suffix_len))
+    return (prefix + suffix)[:4]
+
+
+def generate_passport_number() -> str:
+    series = f"{random.randint(1000, 9999)}"
+    number = f"{random.randint(100000, 999999)}"
+    return f"{series}-{number}"
+
+
+def generate_airlines(count: int) -> list[Airline]:
+    """Генерирует список авиакомпаний с уникальными 3-буквенными кодами"""
+    predefined = [
+        ("AFL", "Аэрофлот"), ("SVR", "Россия"), ("UTK", "ЮТэйр"),
+        ("SBI", "S7 Airlines"), ("DLH", "Lufthansa"), ("BAW", "British Airways"),
+        ("AFR", "Air France"), ("KLM", "KLM"), ("AAL", "American Airlines"),
+        ("UAL", "United Airlines"), ("DAL", "Delta Air Lines"), ("CPA", "Cathay Pacific"),
+        ("SIA", "Singapore Airlines"), ("UAE", "Emirates"), ("ETD", "Etihad Airways"),
+        ("QTR", "Qatar Airways"), ("RYA", "Ryanair"), ("WZZ", "Wizz Air"),
+        ("EZY", "easyJet"), ("TAP", "TAP Air Portugal"), ("LOT", "LOT Polish Airlines"),
+        ("FIN", "Finnair"), ("SAS", "Scandinavian Airlines"), ("AEE", "Aegean Airlines"),
+        ("IBE", "Iberia"), ("VLG", "Vueling"), ("TRA", "Transavia"), ("TUI", "TUI fly"),
+        ("CCA", "Air China"), ("CES", "China Eastern"), ("CSN", "China Southern"),
+        ("JAL", "Japan Airlines"), ("ANA", "ANA"), ("KAL", "Korean Air"),
+        ("SVA", "Saudi Arabian"), ("MSR", "EgyptAir"), ("ETH", "Ethiopian Airlines"),
+        ("KEN", "Kenya Airways"), ("SAA", "South African Airways"), ("LAM", "LAM Mozambique")
+    ]
+
+    airlines = []
+    used_codes = set()
+    for i in range(count):
+        if i < len(predefined):
+            code, name = predefined[i]
+        else:
+            code = fake.lexify("???").upper()
+            while code in used_codes or len(code) != 3:
+                code = fake.lexify("???").upper()
+            name = f"{fake.company()} Airlines"
+        used_codes.add(code)
+        airlines.append(Airline(code=code, name=name))
+    return airlines
+
+
+def populate_database(
+        count_airlines: int = 20,
+        count_airports: int = 100,
+        count_passengers: int = 100,
+        count_flights: int = 100,
+        count_bookings: int = 100
+):
+    print("🔍 Генерация тестовых данных...")
+    print(f"  - Авиакомпаний: {count_airlines}")
+    print(f"  - Аэропортов: {count_airports}")
+    print(f"  - Пассажиров: {count_passengers}")
+    print(f"  - Рейсов: {count_flights}")
+    print(f"  - Бронирований: {count_bookings}")
+
+    # === 1. Авиакомпании ===
+    airlines = generate_airlines(count_airlines)
+    print(f"✅ Сгенерировано {len(airlines)} авиакомпаний")
+
+    # === 2. Аэропорты ===
+    used_icao = set()
+    airports = []
+    for _ in range(count_airports):
+        while True:
+            icao = generate_icao_code()
+            if icao not in used_icao:
+                used_icao.add(icao)
+                break
+        name = fake.city() + " " + random.choice(["International", "Regional", "City", "Central"]) + " Airport"
+        airports.append(Airport(icao_code=icao, name=name))
+    print(f"✅ Сгенерировано {len(airports)} аэропортов")
+
+    # === 3. Пассажиры ===
+    used_passports = set()
+    passengers = []
+    for _ in range(count_passengers):
+        while True:
+            passport = generate_passport_number()
+            if passport not in used_passports:
+                used_passports.add(passport)
+                break
+        passengers.append(Passenger(
+            passport_number=passport,
+            passport_issued_by=fake.city() + " УФМС",
+            passport_issue_date=fake.date_between(start_date="-10y", end_date="-1y"),
+            full_name=fake.name(),
+            birth_date=fake.date_between(start_date="-70y", end_date="-18y")
+        ))
+    print(f"✅ Сгенерировано {len(passengers)} пассажиров")
+
+    # === 4. Вставка базовых сущностей в БД ===
+    with Session(engine) as session:
+        session.add_all(airlines)
+        session.add_all(airports)
+        session.add_all(passengers)
+        session.commit()
+
+        for a in airlines: session.refresh(a)
+        for a in airports: session.refresh(a)
+        for p in passengers: session.refresh(p)
+
+        # === 5. Рейсы ===
+        used_flight_numbers = set()
+        base_date = date.today()
+        flights = []
+
+        for _ in range(count_flights):
+            airline = random.choice(airlines)
+
+            # ✅ Генерируем номер рейса строго с кодом выбранной авиакомпании
+            while True:
+                flight_num = f"{airline.code}-{random.randint(100, 999)}"
+                if flight_num not in used_flight_numbers:
+                    used_flight_numbers.add(flight_num)
+                    break
+
+            dep_airport = random.choice(airports)
+            # Исключаем рейсы "туда-сюда" в один аэропорт
+            eligible_arr = [a for a in airports if a.icao_code != dep_airport.icao_code]
+            arr_airport = random.choice(eligible_arr) if eligible_arr else dep_airport
+
+            total_seats = random.choice([120, 150, 180, 200, 220, 250])
+            # ✅ free_seets всегда равно total_seats при создании рейса
+            free_seats = total_seats
+            
+            # Цены для рейса
+            base_price = round(random.uniform(5000, 50000), 2)  # Базовая цена от 5000 до 50000
+            baggage_price = round(random.uniform(500, 5000), 2)  # Цена багажа от 500 до 5000
+
+            # Генерируем время отправления и прибытия
+            dep_time = time(random.randint(0, 23), random.choice([0, 15, 30, 45]))
+            
+            # Генерируем время прибытия (департура + случайное время полета от 1 до 12 часов)
+            flight_duration_hours = random.randint(1, 12)
+            flight_duration_minutes = random.choice([0, 15, 30, 45])
+            arrival_hour = (dep_time.hour + flight_duration_hours) % 24
+            arrival_minute = (dep_time.minute + flight_duration_minutes) % 60
+            if dep_time.minute + flight_duration_minutes >= 60:
+                arrival_hour = (arrival_hour + 1) % 24
+            arrival_t = time(arrival_hour, arrival_minute)
+
+            flights.append(Flight(
+                flight_number=flight_num,
+                airline_code=airline.code,  # ✅ FK к Airline.code
+                departure_airport_icao=dep_airport.icao_code,  # ✅ FK к Airport.icao_code (ИСПРАВЛЕНО)
+                arrival_airport_icao=arr_airport.icao_code,  # ✅ FK к Airport.icao_code (ИСПРАВЛЕНО)
+                departure_date=base_date + timedelta(days=random.randint(1, 30)),
+                departure_time=dep_time,
+                arrival_time=arrival_t,
+                total_seats=total_seats,
+                free_seats=free_seats,
+                base_price=base_price,
+                baggage_price=baggage_price
+            ))
+
+        session.add_all(flights)
+        session.commit()
+        for f in flights: session.refresh(f)
+        print(f"✅ Сгенерировано {len(flights)} рейсов")
+
+        # === 6. Бронирования ===
+        used_codes = set()
+        bookings = []
+
+        # Ограничиваем кол-во бронирований реальным количеством свободных мест
+        total_free_seats = sum(f.free_seats for f in flights)
+        target_bookings = min(count_bookings, total_free_seats)
+        
+        # Варианты для генерации данных
+        payment_types = ["card", "cash", "online"]
+        
+        for _ in range(target_bookings):
+            eligible_flights = [f for f in flights if f.free_seats > 0]
+            if not eligible_flights:
+                print("⚠️ Нет рейсов с доступными местами. Генерация бронирований завершена.")
+                break
+
+            flight = random.choice(eligible_flights)
+            passenger = random.choice(passengers)
+
+            # Проверяем, не бронировал ли этот пассажир уже этот рейс
+            existing = session.exec(
+                select(Booking).where(
+                    Booking.flight_id == flight.id,
+                    Booking.passenger_id == passenger.id
+                )
+            ).first()
+            if existing:
+                continue
+
+            code = generate_booking_code()
+            while code in used_codes:
+                code = generate_booking_code()
+            used_codes.add(code)
+            
+            # Генерируем случайные значения для новых полей
+            baggage = random.choice([True, False])
+            payment = random.choice(payment_types)
+            additional_fees = round(random.uniform(0, 5000), 2)  # Доп сборы от 0 до 5000
+            class_type = random.choice(["economy", "business", "first"])
+            
+            # Генерируем номер места
+            row = random.randint(1, flight.total_seats // 6 + 1)
+            seat_letter = random.choice(['A', 'B', 'C', 'D', 'E', 'F'])
+            seat_num = f"{row}{seat_letter}"
+
+            bookings.append(Booking(
+                booking_code=code,
+                flight_id=flight.id,
+                passenger_id=passenger.id,
+                seat=seat_num,
+                created_at=datetime.utcnow() - timedelta(days=random.randint(0, 7)),
+                baggage_allowed=baggage,
+                payment_type=payment,
+                additional_fees=additional_fees,
+                class_type=class_type
+            ))
+            flight.free_seats -= 1
+            session.add(flight)
+
+        session.add_all(bookings)
+        session.commit()
+        print(f"✅ Сгенерировано {len(bookings)} бронирований")
+
+    print("🎉 База данных успешно заполнена тестовыми данными!")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Заполнение базы данных тестовыми данными.')
+    parser.add_argument('--airlines', type=int, default=20, help='Количество авиакомпаний (по умолчанию: 20)')
+    parser.add_argument('--airports', type=int, default=100, help='Количество аэропортов (по умолчанию: 100)')
+    parser.add_argument('--passengers', type=int, default=100, help='Количество пассажиров (по умолчанию: 100)')
+    parser.add_argument('--flights', type=int, default=100, help='Количество рейсов (по умолчанию: 100)')
+    parser.add_argument('--bookings', type=int, default=100, help='Количество бронирований (по умолчанию: 100)')
+    args = parser.parse_args()
+
+    populate_database(
+        count_airlines=args.airlines,
+        count_airports=args.airports,
+        count_passengers=args.passengers,
+        count_flights=args.flights,
+        count_bookings=args.bookings
+    )
+
+
+if __name__ == "__main__":
+    main()
+</file>
+
+<file path="tests/conftest.py">
+# tests/conftest.py
+"""
+Конфигурационный файл pytest для тестов API.
+
+Содержит фикстуры для:
+- Инициализации базы данных
+- Создания сессии БД с очисткой между тестами
+- HTTP клиента для тестирования API
+- Генерации тестовых данных (пользователи, авиакомпании, аэропорты, рейсы, пассажиры)
+- Создания токенов авторизации для разных ролей
+"""
+import pytest
+import random
+from fastapi.testclient import TestClient
+from sqlmodel import Session, select, func, delete
+from app.main import app
+from app.db.session import get_session
+from app.core.security import hash_password, create_access_token
+from faker import Faker
+from app.schemas.airport_schema import VALID_ICAO_PREFIXES
+
+# ✅ Прямые импорты моделей (т.к. __init__.py не экспортирует их)
+from app.models.user import User
+from app.models.airport import Airport
+from app.models.airline import Airline
+from app.models.flight import Flight
+from app.models.passenger import Passenger
+from app.models.booking import Booking
+
+fake = Faker('ru_RU')
+Faker.seed(42)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_db():
+    """
+    Инициализирует базу данных перед запуском всех тестов.
+    
+    Фикстура выполняется один раз за сессию тестирования и автоматически
+    инициализирует схему БД.
+    
+    Yields:
+        None: После инициализации передаёт управление тестам.
+    """
+    from app.db.database import init_db
+    init_db()
+    yield
+
+
+@pytest.fixture(scope="function")
+def db_session():
+    """
+    Создаёт изолированную сессию базы данных для каждого теста.
+    
+    Фикстура создаёт новую транзакцию для каждого теста, очищает все таблицы
+    в правильном порядке зависимостей (сначала дочерние, потом родительские),
+    и откатывает изменения после завершения теста.
+    
+    Порядок очистки таблиц:
+    1. Бронирования (Booking) - ссылаются на Рейсы и Пассажиров
+    2. Рейсы (Flight) - ссылаются на Авиакомпании и Аэропорты
+    3. Пассажиры (Passenger)
+    4. Авиакомпании (Airline)
+    5. Аэропорты (Airport)
+    6. Пользователи (User)
+    
+    Yields:
+        Session: Сессия SQLModel для взаимодействия с БД.
+    """
+    from app.db.database import engine
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+
+    # ✅ ИСПРАВЛЕНО: Очистка в строгом порядке зависимостей (сначала дети, потом родители)
+    # 1. Бронирования (ссылаются на Рейсы и Пассажиров)
+    session.execute(delete(Booking))
+    # 2. Рейсы (ссылаются на Авиакомпании и Аэропорты)
+    session.execute(delete(Flight))
+    # 3. Пассажиры
+    session.execute(delete(Passenger))
+    # 4. Авиакомпании
+    session.execute(delete(Airline))
+    # 5. Аэропорты
+    session.execute(delete(Airport))
+    # 6. Пользователи
+    session.execute(delete(User))
+
+    session.commit()
+
+    yield session
+
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest.fixture(scope="function")
+def client(db_session):
+    """
+    Создаёт тестовый HTTP клиент для запросов к API.
+    
+    Переопределяет зависимость get_session для использования тестовой сессии БД,
+    что обеспечивает изоляцию тестов от основной базы данных.
+    
+    Args:
+        db_session: Фикстура сессии базы данных.
+        
+    Yields:
+        TestClient: Клиент для отправки HTTP запросов к FastAPI приложению.
+    """
+    def override_get_session():
+        yield db_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+# --- Динамические ID для негативных тестов ---
+def get_max_id(session, model):
+    """
+    Получает следующий доступный ID для модели.
+    
+    Используется в негативных тестах для проверки поведения при работе
+    с несуществующими записями (например, поиск по ID, которого нет в БД).
+    
+    Args:
+        session: Сессия базы данных.
+        model: Класс модели SQLModel.
+        
+    Returns:
+        int: Следующий доступный ID (максимальный существующий + 1).
+    """
+    result = session.exec(select(func.max(model.id))).first()
+    return (result or 0) + 1
+
+
+@pytest.fixture
+def max_airport_id(db_session): 
+    """Возвращает следующий доступный ID для аэропорта (для негативных тестов)."""
+    return get_max_id(db_session, Airport)
+
+
+@pytest.fixture
+def max_flight_id(db_session): 
+    """Возвращает следующий доступный ID для рейса (для негативных тестов)."""
+    return get_max_id(db_session, Flight)
+
+
+@pytest.fixture
+def max_passenger_id(db_session): 
+    """Возвращает следующий доступный ID для пассажира (для негативных тестов)."""
+    return get_max_id(db_session, Passenger)
+
+
+@pytest.fixture
+def max_booking_id(db_session): 
+    """Возвращает следующий доступный ID для бронирования (для негативных тестов)."""
+    return get_max_id(db_session, Booking)
+
+
+@pytest.fixture
+def max_user_id(db_session): 
+    """Возвращает следующий доступный ID для пользователя (для негативных тестов)."""
+    return get_max_id(db_session, User)
+
+
+# --- Фикстуры данных ---
+@pytest.fixture
+def fake_user_data():
+    """
+    Генерирует случайные данные пользователя для тестов.
+    
+    Returns:
+        dict: Словарь с полями username и password.
+            - username: Уникальное имя пользователя с числовым суффиксом.
+            - password: Сложный пароль длиной 12 символов.
+    """
+    return {
+        "username": f"user_{fake.numerify('####')}",
+        "password": fake.password(length=12, special_chars=True, digits=True, upper_case=True, lower_case=True)
+    }
+
+
+@pytest.fixture
+def fake_airline_data():
+    """
+    Генерирует случайные данные авиакомпании для тестов.
+    
+    Returns:
+        dict: Словарь с полями code и name.
+            - code: Трёхбуквенный код авиакомпании (верхний регистр).
+            - name: Название авиакомпании с суффиксом "Airlines".
+    """
+    return {"code": fake.lexify("???").upper(), "name": fake.company() + " Airlines"}
+
+
+@pytest.fixture
+def fake_airport_data():
+    """
+    Генерирует случайные данные аэропорта с валидным ICAO-кодом для тестов.
+    
+    ICAO-код формируется из префикса региона (из VALID_ICAO_PREFIXES) 
+    и случайных букв до общей длины 4 символа.
+    
+    Returns:
+        dict: Словарь с полями icaoCode и name.
+            - icaoCode: Валидный 4-буквенный ICAO-код.
+            - name: Название аэропорта с суффиксом "Intl".
+    """
+    prefix = random.choice(list(VALID_ICAO_PREFIXES))
+    suffix = ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=4 - len(prefix)))
+    return {"icaoCode": prefix + suffix, "name": fake.city() + " Intl"}
+
+
+@pytest.fixture
+def fake_passenger_data():
+    """
+    Генерирует случайные данные пассажира для тестов.
+    
+    Returns:
+        dict: Словарь с полями:
+            - passportNumber: Номер паспорта в формате "####-######".
+            - passportIssuedBy: Орган выдачи паспорта.
+            - passportIssueDate: Дата выдачи (фиксированная).
+            - fullName: ФИО пассажира.
+            - birthDate: Дата рождения (фиксированная).
+    """
+    return {
+        "passportNumber": f"{fake.numerify('####')}-{fake.numerify('######')}",
+        "passportIssuedBy": f"{fake.city()} UVMS",
+        "passportIssueDate": "2020-01-01",
+        "fullName": fake.name(),
+        "birthDate": "1990-01-01"
+    }
+
+
+@pytest.fixture
+def fake_flight_data(db_session, fake_airline_data, fake_airport_data):
+    """
+    Генерирует случайные данные рейса и создаёт необходимые зависимости.
+    
+    Перед генерацией данных рейса создаёт:
+    - Авиакомпанию (по данным из fake_airline_data)
+    - Аэропорт вылета (по данным из fake_airport_data)
+    - Аэропорт прилёта (случайный, отличный от аэропорта вылета)
+    
+    Args:
+        db_session: Сессия базы данных.
+        fake_airline_data: Данные авиакомпании.
+        fake_airport_data: Данные аэропорта вылета.
+        
+    Returns:
+        dict: Словарь с полями рейса:
+            - flightNumber: Номер рейса в формате "CODE-###".
+            - airlineCode: Код авиакомпании.
+            - departureAirportIcao: ICAO-код аэропорта вылета.
+            - arrivalAirportIcao: ICAO-код аэропорта прилёта.
+            - departureDate: Дата вылета.
+            - departureTime: Время вылета.
+            - totalSeats: Общее количество мест.
+            - freeSeats: Количество свободных мест.
+    """
+    from app.schemas.airline_schema import AirlineCreate
+    from app.schemas.airport_schema import AirportCreate
+    from app.controllers import airline_controller, airport_controller
+
+    airline_controller.create_airline(AirlineCreate(**fake_airline_data), db_session)
+    airport_controller.create_airport(AirportCreate(**fake_airport_data), db_session)
+
+    arr_icao = random.choice(list(VALID_ICAO_PREFIXES)) + ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
+    while arr_icao == fake_airport_data["icaoCode"]:
+        arr_icao = random.choice(list(VALID_ICAO_PREFIXES)) + ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
+    airport_controller.create_airport(AirportCreate(icaoCode=arr_icao, name="Arrival"), db_session)
+
+    return {
+        "flightNumber": f"{fake_airline_data['code']}-{fake.numerify('###')}",
+        "airlineCode": fake_airline_data["code"],
+        "departureAirportIcao": fake_airport_data["icaoCode"],
+        "arrivalAirportIcao": arr_icao,
+        "departureDate": "2026-12-12", 
+        "departureTime": "10:00:00",
+        "arrivalTime": "14:00:00",
+        "totalSeats": 150, 
+        "freeSeats": 50,
+        "basePrice": 10000.0,
+        "baggagePrice": 1500.0
+    }
+
+
+# --- Токены ---
+@pytest.fixture
+def admin_token(db_session, fake_user_data):
+    """
+    Создаёт токен доступа для пользователя с ролью admin.
+    
+    Создаёт нового пользователя в БД с ролью "admin" и генерирует
+    JWT токен доступа для него.
+    
+    Args:
+        db_session: Сессия базы данных.
+        fake_user_data: Данные пользователя (используется только для генерации имени).
+        
+    Returns:
+        str: JWT токен доступа для администратора.
+    """
+    u = User(username=f"admin_{fake.numerify('####')}", password=hash_password("Admin123!"), role="admin")
+    db_session.add(u);
+    db_session.commit()
+    return create_access_token({"sub": u.username})
+
+
+@pytest.fixture
+def dispatcher_token(db_session, fake_user_data):
+    """
+    Создаёт токен доступа для пользователя с ролью dispatcher.
+    
+    Создаёт нового пользователя в БД с ролью "dispatcher" и генерирует
+    JWT токен доступа для него.
+    
+    Args:
+        db_session: Сессия базы данных.
+        fake_user_data: Данные пользователя (используется только для генерации имени).
+        
+    Returns:
+        str: JWT токен доступа для диспетчера.
+    """
+    u = User(username=f"disp_{fake.numerify('####')}", password=hash_password("Disp123!"), role="dispatcher")
+    db_session.add(u);
+    db_session.commit()
+    return create_access_token({"sub": u.username})
+
+
+@pytest.fixture
+def guest_token(db_session, fake_user_data):
+    """
+    Создаёт токен доступа для пользователя с ролью guest.
+    
+    Создаёт нового пользователя в БД с ролью "guest" и генерирует
+    JWT токен доступа для него.
+    
+    Args:
+        db_session: Сессия базы данных.
+        fake_user_data: Данные пользователя (используется только для генерации имени).
+        
+    Returns:
+        str: JWT токен доступа для гостя.
+    """
+    u = User(username=f"guest_{fake.numerify('####')}", password=hash_password("Guest123!"), role="guest")
+    db_session.add(u);
+    db_session.commit()
+    return create_access_token({"sub": u.username})
+</file>
+
+<file path="app/api/v1/airport_router.py">
+# app/api/v1/airport_router.py
+
+from fastapi import APIRouter, Depends, status, Query
+from sqlmodel import Session, select
+
+from app.models.airport import Airport
+from app.db.session import get_session
+from app.schemas.airport_schema import AirportCreate, AirportUpdate, AirportResponse
+from app.controllers.airport_controller import (
+    get_all_airports,
+    get_airport_by_id,
+    get_airport_by_icao,
+    create_airport,
+    update_airport,
+    delete_airport
+)
+from app.core.security import admin_required, get_current_user, dispatcher_or_higher
+from typing import List
+from fastapi_pagination import Page, Params
+from fastapi_pagination.ext.sqlmodel import paginate
+
+router = APIRouter(prefix="", tags=["Аэропорты"])
+
+# Вместо get_airports_list:
+
+@router.get("", response_model=Page[AirportResponse])
+def get_airports_paginated(
+    session: Session = Depends(get_session),
+    current_user=Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=1000)  # ✅ Увеличен лимит до 1000
+):
+    return paginate(session, select(Airport), Params(page=page, size=size))
+
+@router.get("/{airport_id}", response_model=AirportResponse)
+def get_airport_by_id_endpoint(airport_id: int, session: Session = Depends(get_session),
+                               current_user = Depends(get_current_user)):
+    """
+    Получение аэропорта по ID.
+    """
+    airport = get_airport_by_id(airport_id, session)
+    return AirportResponse.model_validate(airport, from_attributes=True)
+
+@router.get("/by-icao/{icao_code}", response_model=AirportResponse)
+def get_airport_by_icao_endpoint(icao_code: str, session: Session = Depends(get_session),
+                                 current_user = Depends(get_current_user)):
+    """
+    Получение аэропорта по ICAO-коду.
+    """
+    airport = get_airport_by_icao(icao_code, session)
+    return AirportResponse.model_validate(airport, from_attributes=True)
+
+@router.post("", response_model=AirportResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_required)])
+def create_airport_endpoint(
+    data: AirportCreate,
+    session: Session = Depends(get_session),
+    current_user=Depends(admin_required)
+):
+    """
+    Создание нового аэропорта (только для администратора).
+    """
+    airport = create_airport(data, session)
+    return AirportResponse.model_validate(airport, from_attributes=True)
+
+@router.put("/{airport_id}", response_model=AirportResponse, dependencies=[Depends(admin_required)])
+def update_airport_endpoint(
+    airport_id: int,
+    data: AirportUpdate,
+    session: Session = Depends(get_session),
+    current_user=Depends(admin_required)
+):
+    """
+    Обновление аэропорта по ID (только для администратора).
+    """
+    airport = update_airport(airport_id, data, session)
+    return AirportResponse.model_validate(airport, from_attributes=True)
+
+@router.delete("/{airport_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_required)])
+def delete_airport_endpoint(
+    airport_id: int,
+    session: Session = Depends(get_session),
+    current_user=Depends(admin_required)
+):
+    """
+    Удаление аэропорта по ID (только для администратора).
+    """
+    delete_airport(airport_id, session)
+    return # 204 No Content
+</file>
+
+<file path="app/api/v1/auth_router.py">
+# app/api/v1/auth_router.py
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from pydantic import ValidationError
+from sqlmodel import Session, select
+from app.db.session import get_session
+from app.models.user import User
+from app.schemas.user_schema import UserCreate, UserLogin, TokenResponse, UserResponse
+from app.schemas.user_schema import UserUpdateRole
+from app.controllers.user_controller import create_user, authenticate_user, update_user_role, get_all_users
+from app.core.security import decode_token, create_access_token, get_current_user, admin_required
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+router = APIRouter(prefix="", tags=["Аутентификация"])
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register(data: UserCreate, session: Session = Depends(get_session)):
+    """Регистрация нового пользователя"""
+    user = create_user(data, session)
+    return UserResponse(id=user.id, username=user.username, role=user.role)
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+        data: UserLogin,  # ИСПРАВЛЕНО: принимаем данные напрямую через Pydantic
+        response: Response,
+        session: Session = Depends(get_session),
+):
+    """Авторизация (JSON) и установка access_token в cookie."""
+
+    # Аутентификация по username и password
+    tokens = authenticate_user(data.username, data.password, session)
+
+    response.set_cookie(
+        key="access_token",
+        value=tokens["access_token"],
+        httponly=True,  # Защита от XSS
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Время жизни в секундах
+        samesite="lax",  # Для лучшей совместимости
+        path="/",  # Доступность на всем сайте
+        secure=False,  # Для production должно быть True (требует HTTPS)
+    )
+
+    return tokens
+
+
+@router.post("/refresh", response_model=dict)
+def refresh_token(refresh_token: str):
+    """Обновление access токена"""
+    username = decode_token(refresh_token, expected_type="refresh")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Невалидный токен"
+        )
+
+    new_access_token = create_access_token(data={"sub": username})
+    return {"accessToken": new_access_token, "tokenType": "bearer"}
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user=Depends(get_current_user)):
+    """Получение информации о текущем пользователе"""
+    return UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        role=current_user.role
+    )
+
+
+@router.put("/{user_id}/role", response_model=UserResponse, dependencies=[Depends(admin_required)])
+def change_user_role(
+        user_id: int,
+        new_role: UserUpdateRole,
+        session: Session = Depends(get_session),
+        current_user=Depends(get_current_user)
+):
+    """Изменение роли пользователя (только для администратора)"""
+    updated_user = update_user_role(user_id, new_role.role, session)
+    return UserResponse(
+        id=updated_user.id,
+        username=updated_user.username,
+        role=updated_user.role
+    )
+
+
+@router.get("/users", response_model=Page[UserResponse], dependencies=[Depends(admin_required)])
+def get_all_users_paginated(session: Session = Depends(get_session)):
+    return paginate(session, select(User))
+
+
+@router.post("/logout")
+def logout(response: Response):
+    """Выход из системы - удаление cookie"""
+    response.delete_cookie(
+        key="access_token",
+        path="/"
+    )
+    return {"detail": "Logged out"}
+</file>
+
+<file path=".gitignore">
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.ENV.*
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+```
+</file>
+
+<file path="app/api/v1/booking_router.py">
+# app/api/v1/booking_router.py
+from fastapi import APIRouter, Depends, status, Response
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+from sqlmodel import Session, select
+from app.db.session import get_session
+from app.schemas.booking_schema import BookingCreate, BookingResponse, ConnectionAddPayload
+from app.controllers.booking_controller import *
+from app.core.security import get_current_user, admin_required, dispatcher_or_higher
+from typing import List
+
+router = APIRouter(prefix="", tags=["Бронирование"])
+
+
+@router.post("/", response_model=List[BookingResponse], status_code=status.HTTP_201_CREATED)
+def sell_ticket_endpoint(data: BookingCreate, session: Session = Depends(get_session), current_user=Depends(dispatcher_or_higher)):
+    bookings = sell_ticket(data, session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
+
+@router.post("/{booking_code}/connections", response_model=List[BookingResponse], status_code=status.HTTP_201_CREATED)
+def add_connections_endpoint(booking_code: str, data: ConnectionAddPayload, session: Session = Depends(get_session), current_user=Depends(dispatcher_or_higher)):
+    bookings = add_connections_to_booking(booking_code, data.flightIds, session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
+
+
+@router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_ticket_endpoint(
+    booking_id: int,
+    session: Session = Depends(get_session),
+    current_user = Depends(admin_required)
+):
+    """Отмена продажи билета"""
+    cancel_ticket(booking_id, session)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/by-flight/{flight_id}", response_model=List[BookingResponse], dependencies=[Depends(get_current_user)])
+def get_bookings_by_flight_endpoint(
+    flight_id: int,
+    session: Session = Depends(get_session),
+    current_user=Depends(dispatcher_or_higher)
+):
+    """Получение бронирований по рейсу"""
+    bookings = get_bookings_by_flight(flight_id, session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
+
+
+
+@router.get("/by-passenger/{passport}", response_model=List[BookingResponse])
+def get_bookings_by_passenger_endpoint(
+    passport: str,
+    session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    """Получение бронирований по паспорту пассажира"""
+    bookings = get_bookings_by_passenger(passport, session)
+    return [BookingResponse.model_validate(b, from_attributes=True) for b in bookings]
+
+
+@router.get("", response_model=Page[BookingResponse])
+def get_all_bookings_paginated(
+    session: Session = Depends(get_session),
+    current_user=Depends(dispatcher_or_higher)
+):
+    return paginate(session, select(Booking))
+</file>
+
+<file path="app/api/v1/flight_router.py">
+from fastapi import APIRouter, Depends, status, HTTPException, Response
+from sqlmodel import Session, select
+from app.db.session import get_session
+from app.schemas.flight_schema import FlightCreate, FlightUpdate, FlightResponse, FlightWithPassengersResponse, \
+    PassengerBrief, BookingPassengerResponse
+from app.models.flight import Flight
+from app.controllers.flight_controller import (
+    create_flight, get_flight_by_id, get_flight_by_number,
+    update_flight, delete_flight, search_flights_by_arrival,
+    get_flight_with_passengers_by_number, delete_all_flights
+)
+from app.core.security import get_current_user, admin_required, dispatcher_or_higher
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
+from typing import List
+
+router = APIRouter(prefix="", tags=["Авиарейсы"])
+
+@router.post("", response_model=FlightResponse, status_code=status.HTTP_201_CREATED)
+def create_flight_endpoint(
+    data: FlightCreate,
+    session: Session = Depends(get_session),
+    current_user = Depends(dispatcher_or_higher)
+):
+    flight = create_flight(data, session)
+    return FlightResponse.model_validate(flight, from_attributes=True)
+
+@router.get("", response_model=Page[FlightResponse])
+def get_flights_endpoint(session: Session = Depends(get_session), current_user = Depends(get_current_user)):
+    return paginate(session, select(Flight))
+
+@router.get("/{flight_id}", response_model=FlightResponse)
+def get_flight_endpoint(flight_id: int, session: Session = Depends(get_session), current_user = Depends(get_current_user)):
+    flight = get_flight_by_id(flight_id, session)
+    return FlightResponse.model_validate(flight, from_attributes=True)
+
+@router.put("/{flight_id}", response_model=FlightResponse)
+def update_flight_endpoint(
+    flight_id: int,
+    data: FlightUpdate,
+    session: Session = Depends(get_session),
+    current_user=Depends(admin_required)
+):
+    flight = update_flight(flight_id, data, session)
+    return FlightResponse.model_validate(flight, from_attributes=True)
+
+@router.delete("/{flight_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_flight_endpoint(flight_id: int, session: Session = Depends(get_session), current_user = Depends(admin_required)):
+    delete_flight(flight_id, session)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get("/search/by-arrival/{airport_query}", response_model=List[FlightResponse])
+def search_flights_by_arrival_endpoint(airport_query: str, session: Session = Depends(get_session), current_user = Depends(get_current_user)):
+    flights = search_flights_by_arrival(airport_query, session)
+    return [FlightResponse.model_validate(f, from_attributes=True) for f in flights]
+
+
+@router.get("/by-number/{flight_number}", response_model=FlightWithPassengersResponse)
+def get_flight_by_number_with_passengers_endpoint(
+        flight_number: str,
+        session: Session = Depends(get_session),
+        current_user=Depends(dispatcher_or_higher)
+):
+    flight, bookings_data = get_flight_with_passengers_by_number(flight_number, session)
+    flight_response = FlightResponse.model_validate(flight, from_attributes=True)
+
+    # Преобразуем список словарей в Pydantic-модели
+    passengers_list = [BookingPassengerResponse.model_validate(b, from_attributes=True) for b in bookings_data]
+
+    return FlightWithPassengersResponse(flight=flight_response, passengers=passengers_list)
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_required)])
+def delete_all_flights_endpoint(
+    confirm: bool = False,
+    session: Session = Depends(get_session),
+    current_user=Depends(admin_required)
+):
+    if not confirm:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Подтвердите удаление: ?confirm=true")
+    delete_all_flights(session)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+</file>
+
+<file path="app/schemas/booking_schema.py">
+from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Optional, List
+
+class BookingCreate(BaseModel):
+    flightId: int
+    passengerIds: List[int] = Field(..., min_length=1, description="ID пассажиров для группового бронирования")
+    connectionFlightIds: Optional[List[int]] = Field(default=None, description="ID рейсов для пересадок")
+    bookingCode: Optional[str] = Field(None)
+    seats: Optional[List[str]] = Field(default=None, description="Номера мест для пассажиров")
+    baggageAllowed: bool = Field(default=False, description="Возможность багажа")
+    paymentType: str = Field(default="card", description="Тип оплаты: card, cash, online")
+    additionalFees: float = Field(default=0.0, description="Дополнительные сборы")
+    classType: str = Field(default="economy", description="Класс обслуживания: economy, business, first")
+
+class BookingResponse(BaseModel):
+    id: int
+    bookingCode: str = Field(alias="booking_code")
+    flightId: int = Field(alias="flight_id")
+    passengerId: int = Field(alias="passenger_id")
+    seat: str = Field(alias="seat")
+    createdAt: datetime = Field(alias="created_at")
+    baggageAllowed: bool = Field(default=False, alias="baggage_allowed")
+    paymentType: str = Field(default="card", alias="payment_type")
+    additionalFees: float = Field(default=0.0, alias="additional_fees")
+    classType: str = Field(default="economy", alias="class_type", description="Класс обслуживания")
+    finalPrice: float = Field(description="Финальная цена", alias="final_price")
+
+    class Config:
+        from_attributes = True
+
+class ConnectionAddPayload(BaseModel):
+    flightIds: List[int]
+</file>
+
+<file path="app/schemas/flight_schema.py">
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from datetime import date, time, datetime
+from typing import Optional, List
+import re
+
+class FlightCreate(BaseModel):
+    flightNumber: str = Field(..., description="Номер рейса в формате AAA-NNN")
+    airlineCode: str = Field(..., min_length=3, max_length=3, description="Код авиакомпании")
+    departureAirportIcao: str = Field(..., max_length=4)
+    arrivalAirportIcao: str = Field(..., max_length=4)
+    departureDate: date
+    departureTime: time
+    arrivalTime: time
+    totalSeats: int = Field(..., gt=0)
+    basePrice: float = Field(default=0.0, description="Базовая цена билета")
+    baggagePrice: float = Field(default=0.0, description="Цена багажа")
+
+    @field_validator('flightNumber')
+    @classmethod
+    def validate_flight_number(cls, v):
+        if not re.match(r'^[A-Z]{3}-\d{3}$', v.upper()):
+            raise ValueError('Номер рейса должен быть строго в формате AAA-NNN')
+        return v.upper()
+
+    @field_validator('airlineCode')
+    @classmethod
+    def validate_airline_code(cls, v):
+        return v.upper()
+
+    @model_validator(mode='after')
+    def check_prefix_match(self):
+        prefix = self.flightNumber.split('-')[0]
+        if prefix != self.airlineCode:
+            raise ValueError(f'Префикс номера рейса ({prefix}) должен совпадать с кодом авиакомпании ({self.airlineCode})')
+        return self
+
+class FlightUpdate(BaseModel):
+    flightNumber: Optional[str] = None
+    airlineCode: Optional[str] = None
+    departureAirportIcao: Optional[str] = None
+    arrivalAirportIcao: Optional[str] = None
+    departureDate: Optional[date] = None
+    departureTime: Optional[time] = None
+    arrivalTime: Optional[time] = None
+    totalSeats: Optional[int] = None
+    freeSeats: Optional[int] = None
+    basePrice: Optional[float] = None
+    baggagePrice: Optional[float] = None
+
+class FlightResponse(BaseModel):
+    id: int
+    flightNumber: str = Field(alias="flight_number")
+    airlineCode: str = Field(alias="airline_code") # ✅ Обновлено
+    departureAirportIcao: str = Field(alias="departure_airport_icao")
+    arrivalAirportIcao: str = Field(alias="arrival_airport_icao")
+    departureDate: date = Field(alias="departure_date")
+    departureTime: time = Field(alias="departure_time")
+    arrivalTime: time = Field(alias="arrival_time")
+    totalSeats: int = Field(alias="total_seats")
+    freeSeats: int = Field(alias="free_seats")
+    basePrice: float = Field(default=0.0, alias="base_price", description="Базовая цена билета")
+    baggagePrice: float = Field(default=0.0, alias="baggage_price", description="Цена багажа")
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+
+class PassengerBrief(BaseModel):
+    full_name: str = Field(alias="full_name")
+    passport_number: str = Field(alias="passport_number")
+    model_config = ConfigDict(from_attributes=True)
+
+class BookingPassengerResponse(BaseModel):
+    id: int
+    booking_code: str = Field(alias="booking_code")
+    booked_at: datetime = Field(alias="booked_at")
+    passenger: PassengerBrief
+    model_config = ConfigDict(from_attributes=True)
+
+class FlightWithPassengersResponse(BaseModel):
+    flight: FlightResponse
+    passengers: List[BookingPassengerResponse]
+    model_config = ConfigDict(from_attributes=True)
+</file>
+
+<file path="app/controllers/booking_controller.py">
+# app/controllers/booking_controller.py
+from sqlmodel import Session, select
+from fastapi import HTTPException, status
+from app.models.booking import Booking, generate_booking_code
+from app.models.flight import Flight
+from app.models.passenger import Passenger
+from typing import List
+from app.schemas.booking_schema import BookingCreate # <-- Импортируем схему
+
+
+def generate_seat(flight: Flight, occupied_seats: set) -> str:
+    """Генерирует номер места в формате '12A' где 12 - ряд, A-F - место.
+    
+    Args:
+        flight: Объект рейса для определения класса обслуживания
+        occupied_seats: Множество занятых мест
+        
+    Returns:
+        str: Номер свободного места
+    """
+    rows = list(range(1, flight.total_seats // 6 + 1))  # Примерно 6 мест на ряд
+    seat_letters = ['A', 'B', 'C', 'D', 'E', 'F']
+    
+    for row in rows:
+        for letter in seat_letters:
+            seat_num = f"{row}{letter}"
+            if seat_num not in occupied_seats:
+                return seat_num
+    
+    raise HTTPException(status_code=400, detail="Нет свободных мест для выбора")
+
+
+def sell_ticket(data: BookingCreate, session: Session) -> List[Booking]:
+    p_count = len(data.passengerIds)
+
+    # 1. Проверка основного рейса и мест
+    flight = session.get(Flight, data.flightId)
+    if not flight:
+        raise HTTPException(status_code=404, detail="Основной рейс не найден")
+    if flight.free_seats < p_count:
+        raise HTTPException(status_code=400, detail="Недостаточно мест на основном рейсе")
+
+    # 2. Проверка пассажиров
+    passengers = session.exec(select(Passenger).where(Passenger.id.in_(data.passengerIds))).all()
+    if len(passengers) != p_count:
+        raise HTTPException(status_code=400, detail="Один или несколько пассажиров не найдены")
+
+    # 3. Проверка дубликатов на основной рейс
+    existing = session.exec(select(Booking).where(
+        Booking.flight_id == data.flightId,
+        Booking.passenger_id.in_(data.passengerIds)
+    )).all()
+    if existing:
+        raise HTTPException(status_code=400, detail="Билет уже куплен для одного из пассажиров на этот рейс")
+
+    booking_code = data.bookingCode or generate_booking_code()
+
+    # 4. Получение занятых мест для генерации новых
+    existing_bookings = session.exec(select(Booking).where(Booking.flight_id == data.flightId)).all()
+    occupied_seats = {b.seat for b in existing_bookings if b.seat}
+
+    # 5. Генерация мест для новых пассажиров
+    seats_to_assign = []
+    if data.seats:
+        # Если места указаны вручную, проверяем их доступность
+        if len(data.seats) != p_count:
+            raise HTTPException(status_code=400, detail="Количество указанных мест не совпадает с количеством пассажиров")
+        for seat in data.seats:
+            if seat in occupied_seats:
+                raise HTTPException(status_code=400, detail=f"Место {seat} уже занято")
+            seats_to_assign.append(seat)
+            occupied_seats.add(seat)
+    else:
+        # Автоматическая генерация мест
+        for _ in range(p_count):
+            seat = generate_seat(flight, occupied_seats)
+            seats_to_assign.append(seat)
+            occupied_seats.add(seat)
+
+    # 6. Проверка рейсов пересадки
+    connection_flights = []
+    if data.connectionFlightIds:
+        for fid in data.connectionFlightIds:
+            cf = session.get(Flight, fid)
+            if not cf:
+                raise HTTPException(status_code=404, detail=f"Рейс пересадки {fid} не найден")
+            if cf.free_seats < p_count:
+                raise HTTPException(status_code=400, detail=f"Недостаточно мест на рейсе пересадки {cf.flight_number}")
+
+            dup_cf = session.exec(select(Booking).where(
+                Booking.flight_id == fid,
+                Booking.passenger_id.in_(data.passengerIds)
+            )).all()
+            if dup_cf:
+                raise HTTPException(status_code=400, detail=f"Пассажир уже имеет билет на рейс {cf.flight_number}")
+            
+            # Получаем занятые места для рейса пересадки
+            cf_existing = session.exec(select(Booking).where(Booking.flight_id == fid)).all()
+            cf_occupied = {b.seat for b in cf_existing if b.seat}
+            
+            connection_flights.append((cf, cf_occupied))
+
+    try:
+        created_bookings = []
+        for idx, p_id in enumerate(data.passengerIds):
+            created_bookings.append(Booking(
+                booking_code=booking_code, 
+                flight_id=data.flightId, 
+                passenger_id=p_id,
+                seat=seats_to_assign[idx],
+                baggage_allowed=data.baggageAllowed,
+                payment_type=data.paymentType,
+                additional_fees=data.additionalFees,
+                class_type=data.classType
+            ))
+            for cf, cf_occupied in connection_flights:
+                # Генерируем место для пересадки
+                conn_seat = generate_seat(cf, cf_occupied)
+                cf_occupied.add(conn_seat)
+                created_bookings.append(Booking(
+                    booking_code=booking_code, 
+                    flight_id=cf.id, 
+                    passenger_id=p_id,
+                    seat=conn_seat,
+                    baggage_allowed=data.baggageAllowed,
+                    payment_type=data.paymentType,
+                    additional_fees=data.additionalFees,
+                    class_type=data.classType
+                ))
+
+        # Списание мест
+        flight.free_seats -= p_count
+        session.add(flight)
+        for cf, _ in connection_flights:
+            cf.free_seats -= p_count
+            session.add(cf)
+
+        session.add_all(created_bookings)
+        session.commit()
+        for b in created_bookings:
+            session.refresh(b)
+        return created_bookings
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка при создании бронирования: {str(e)}")
+
+
+def add_connections_to_booking(booking_code: str, flight_ids: List[int], session: Session) -> List[Booking]:
+    existing = session.exec(select(Booking).where(Booking.booking_code == booking_code)).all()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Бронирование не найдено")
+
+    passenger_ids = list(set(b.passenger_id for b in existing))
+    p_count = len(passenger_ids)
+    
+    # Получаем параметры оплаты и багажа из существующего бронирования
+    first_booking = existing[0]
+    baggage_allowed = first_booking.baggage_allowed
+    payment_type = first_booking.payment_type
+    additional_fees = first_booking.additional_fees
+    class_type = first_booking.class_type
+
+    try:
+        new_bookings = []
+        for fid in flight_ids:
+            flight = session.get(Flight, fid)
+            if not flight:
+                raise HTTPException(status_code=404, detail=f"Рейс {fid} не найден")
+            if flight.free_seats < p_count:
+                raise HTTPException(status_code=400, detail=f"Недостаточно мест на рейсе {flight.flight_number}")
+
+            dup = session.exec(select(Booking).where(
+                Booking.flight_id == fid,
+                Booking.passenger_id.in_(passenger_ids)
+            )).all()
+            if dup:
+                raise HTTPException(status_code=400, detail="Один из пассажиров уже имеет билет на этот рейс")
+
+            # Получаем занятые места для рейса
+            cf_existing = session.exec(select(Booking).where(Booking.flight_id == fid)).all()
+            cf_occupied = {b.seat for b in cf_existing if b.seat}
+
+            for p_id in passenger_ids:
+                # Генерируем место для нового бронирования
+                seat = generate_seat(flight, cf_occupied)
+                cf_occupied.add(seat)
+                new_bookings.append(Booking(
+                    booking_code=booking_code, 
+                    flight_id=fid, 
+                    passenger_id=p_id,
+                    seat=seat,
+                    baggage_allowed=baggage_allowed,
+                    payment_type=payment_type,
+                    additional_fees=additional_fees,
+                    class_type=class_type
+                ))
+
+            flight.free_seats -= p_count
+            session.add(flight)
+
+        session.add_all(new_bookings)
+        session.commit()
+        for b in new_bookings:
+            session.refresh(b)
+        return new_bookings
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- (остальные функции остаются без изменений) ---
+
+def cancel_ticket(booking_id: int, session: Session):
+    """Отмена билета"""
+    booking = session.get(Booking, booking_id)
+    if not booking:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Бронирование не найдено"
+        )
+
+    flight = session.get(Flight, booking.flight_id)
+    if flight:
+        flight.free_seats += 1
+        session.add(flight)
+
+    session.delete(booking)
+    session.commit()
+
+
+
+def get_bookings_by_flight(flight_id: int, session: Session) -> List[Booking]:
+    """Получение бронирований по рейсу"""
+    return session.exec(
+        select(Booking).where(Booking.flight_id == flight_id)
+    ).all()
+
+
+def get_bookings_by_passenger(passport: str, session: Session) -> List[Booking]:
+    """Получение бронирований пассажира"""
+    passenger = session.exec(
+        select(Passenger).where(Passenger.passport_number == passport)
+    ).first()
+
+    if not passenger:
+        return []
+
+    return session.exec(
+        select(Booking).where(Booking.passenger_id == passenger.id)
+    ).all()
+</file>
+
+<file path="app/controllers/flight_controller.py">
+from sqlmodel import Session, select, delete
+from fastapi import HTTPException, status
+
+from app.models.airline import Airline
+from app.models.booking import Booking
+from app.models.flight import Flight
+from app.models.airport import Airport
+from app.models.passenger import Passenger
+from app.schemas.flight_schema import FlightCreate, FlightUpdate
+from typing import List, Optional
+
+
+def create_flight(data: FlightCreate, session: Session) -> Flight:
+    """
+    Создание нового авиарейса с полной валидацией.
+    При создании рейса free_seats автоматически устанавливается равным total_seats.
+    """
+    airline = session.exec(
+        select(Airline).where(Airline.code == data.airlineCode.upper())
+    ).first()
+    if not airline:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Авиакомпания с кодом {data.airlineCode} не зарегистрирована в системе"
+        )
+    dep_airport = session.exec(
+        select(Airport).where(Airport.icao_code == data.departureAirportIcao.upper())
+    ).first()
+
+    if not dep_airport:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Аэропорт отправления с ICAO-кодом {data.departureAirportIcao} не найден"
+        )
+    arr_airport = session.exec(
+        select(Airport).where(Airport.icao_code == data.arrivalAirportIcao.upper())
+    ).first()
+
+    if not arr_airport:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Аэропорт прибытия с ICAO-кодом {data.arrivalAirportIcao} не найден"
+        )
+    if dep_airport.icao_code == arr_airport.icao_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Аэропорты отправления и прибытия не могут совпадать"
+        )
+    flight_prefix = data.flightNumber.split('-')[0].upper()
+    if flight_prefix != data.airlineCode.upper():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Префикс номера рейса ({flight_prefix}) должен совпадать с кодом авиакомпании ({data.airlineCode})"
+        )
+    existing_flight = session.exec(
+        select(Flight).where(Flight.flight_number == data.flightNumber.upper())
+    ).first()
+    if existing_flight:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Рейс с таким номером уже существует"
+        )
+    # ✅ free_seats всегда равно total_seats при создании рейса
+    flight = Flight(
+        flight_number=data.flightNumber.upper(),
+        airline_code=data.airlineCode.upper(),
+        departure_airport_icao=dep_airport.icao_code,
+        arrival_airport_icao=arr_airport.icao_code,
+        departure_date=data.departureDate,
+        departure_time=data.departureTime,
+        arrival_time=data.arrivalTime,
+        total_seats=data.totalSeats,
+        free_seats=data.totalSeats,  # ✅ Игнорируем переданное значение, всегда ставим максимум
+        base_price=data.basePrice,
+        baggage_price=data.baggagePrice
+    )
+
+    session.add(flight)
+    session.commit()
+    session.refresh(flight)
+
+    return flight
+
+
+def get_all_flights(session: Session) -> List[Flight]:
+    return session.exec(select(Flight)).all()
+
+
+def get_flight_by_id(flight_id: int, session: Session) -> Flight:
+    flight = session.get(Flight, flight_id)
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
+    return flight
+
+
+def get_flight_by_number(flight_number: str, session: Session) -> Flight:
+    flight = session.exec(select(Flight).where(Flight.flight_number == flight_number.upper())).first()
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
+    return flight
+
+
+def update_flight(flight_id: int, data: FlightUpdate, session: Session) -> Flight:
+    flight = session.get(Flight, flight_id)
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
+
+    update_data = data.model_dump(exclude_unset=True)
+
+    # Преобразуем camelCase -> snake_case
+    snake_case_update_data = {}
+    for key, value in update_data.items():
+        snake_key = ''.join(['_' + c.lower() if c.isupper() else c for c in key]).lstrip('_')
+        # Нормализуем ICAO-коды и номера рейсов
+        if snake_key in ('departure_airport_icao', 'arrival_airport_icao', 'flight_number'):
+            snake_case_update_data[snake_key] = value.upper()
+        else:
+            snake_case_update_data[snake_key] = value
+
+    #  Валидация новых аэропортов при изменении
+    if 'departure_airport_icao' in snake_case_update_data:
+        dep = session.exec(
+            select(Airport).where(Airport.icao_code == snake_case_update_data['departure_airport_icao'])).first()
+        if not dep: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                        detail="Аэропорт отправления не найден")
+
+    if 'arrival_airport_icao' in snake_case_update_data:
+        arr = session.exec(
+            select(Airport).where(Airport.icao_code == snake_case_update_data['arrival_airport_icao'])).first()
+        if not arr: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Аэропорт прибытия не найден")
+
+    for key, value in snake_case_update_data.items():
+        setattr(flight, key, value)
+
+    session.add(flight)
+    session.commit()
+    session.refresh(flight)
+    return flight
+
+
+def delete_flight(flight_id: int, session: Session):
+    """Удаление рейса с каскадным удалением связанных бронирований"""
+    flight = session.get(Flight, flight_id)
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
+
+    # 1️⃣ Сначала удаляем все бронирования, привязанные к этому рейсу
+    bookings_to_delete = session.exec(
+        select(Booking).where(Booking.flight_id == flight_id)
+    ).all()
+
+    for booking in bookings_to_delete:
+        session.delete(booking)
+
+    # 2️⃣ Только теперь удаляем сам рейс
+    session.delete(flight)
+    session.commit()
+
+
+def search_flights_by_arrival(airport_query: str, session: Session) -> List[Flight]:
+    matching_airports = session.exec(
+        select(Airport.icao_code).where(
+            (Airport.name.contains(airport_query)) |
+            (Airport.icao_code.contains(airport_query.upper()))
+        )
+    ).all()
+    if not matching_airports:
+        return []
+    return session.exec(select(Flight).where(Flight.arrival_airport_icao.in_(matching_airports))).all()
+
+
+def get_flight_with_passengers_by_number(flight_number: str, session: Session):
+    flight = session.exec(select(Flight).where(Flight.flight_number == flight_number.upper())).first()
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рейс не найден")
+
+    bookings = session.exec(select(Booking).where(Booking.flight_id == flight.id)).all()
+    result = []
+    for b in bookings:
+        p = session.get(Passenger, b.passenger_id)
+        result.append({
+            "id": b.id,
+            "booking_code": b.booking_code,
+            "booked_at": b.created_at.isoformat() if b.created_at else None,
+            "passenger": {
+                "full_name": p.full_name if p else "Пассажир удалён",
+                "passport_number": p.passport_number if p else "N/A"
+            }
+        })
+    return flight, result
+
+
+def delete_all_flights(session: Session):
+    flight_ids = session.exec(select(Flight.id)).all()
+    if flight_ids:
+        session.exec(delete(Booking).where(Booking.flight_id.in_(flight_ids)))
+    session.exec(delete(Flight))
+    session.commit()
+</file>
+
+</files>
