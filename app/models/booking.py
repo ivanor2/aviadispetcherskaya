@@ -27,5 +27,5 @@ class Booking(SQLModel, table=True):
     
     @property
     def final_price(self) -> float:
-        """Вычисляет финальную цену как сумму базовой цены рейса, цены багажа (если есть) и дополнительных сборов"""
-        return self.additional_fees
+        """Вычисляет финальную цену как сумму базовой цены, налога и дополнительных сборов"""
+        return self.base_price + self.tax + self.additional_fees

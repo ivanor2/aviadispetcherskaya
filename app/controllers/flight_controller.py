@@ -70,7 +70,9 @@ def create_flight(data: FlightCreate, session: Session) -> Flight:
         departure_time=data.departureTime,
         arrival_time=data.arrivalTime,
         total_seats=data.totalSeats,
-        free_seats=data.totalSeats  # ✅ Игнорируем переданное значение, всегда ставим максимум
+        free_seats=data.totalSeats,  # ✅ Игнорируем переданное значение, всегда ставим максимум
+        base_price=data.basePrice,
+        baggage_price=data.baggagePrice
     )
 
     session.add(flight)

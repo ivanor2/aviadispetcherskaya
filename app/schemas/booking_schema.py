@@ -10,8 +10,6 @@ class BookingCreate(BaseModel):
     seats: Optional[List[str]] = Field(default=None, description="Номера мест для пассажиров")
     baggageAllowed: bool = Field(default=False, description="Возможность багажа")
     paymentType: str = Field(default="card", description="Тип оплаты: card, cash, online")
-    basePrice: float = Field(default=0.0, description="Базовая цена")
-    tax: float = Field(default=0.0, description="Налог")
     additionalFees: float = Field(default=0.0, description="Дополнительные сборы")
     classType: str = Field(default="economy", description="Класс обслуживания: economy, business, first")
 
@@ -24,8 +22,6 @@ class BookingResponse(BaseModel):
     createdAt: datetime = Field(alias="created_at")
     baggageAllowed: bool = Field(default=False, alias="baggage_allowed")
     paymentType: str = Field(default="card", alias="payment_type")
-    basePrice: float = Field(default=0.0, alias="base_price")
-    tax: float = Field(default=0.0, alias="tax")
     additionalFees: float = Field(default=0.0, alias="additional_fees")
     classType: str = Field(default="economy", alias="class_type", description="Класс обслуживания")
     finalPrice: float = Field(description="Финальная цена", alias="final_price")

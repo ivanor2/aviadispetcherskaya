@@ -17,3 +17,7 @@ class Flight(SQLModel, table=True):
     arrival_time: time
     total_seats: int
     free_seats: int
+    
+    # Поля для управления ценами
+    base_price: float = Field(default=0.0, description="Базовая цена билета")
+    baggage_price: float = Field(default=0.0, description="Цена багажа")

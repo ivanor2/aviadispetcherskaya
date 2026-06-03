@@ -1,4 +1,4 @@
-```gitignore
+```
 # Python
 __pycache__/
 *.pyc
@@ -9,48 +9,33 @@ env/
 venv/
 .venv/
 .ENV
-.ENV.local
+.ENV.*
 .env
-.env.local
 .env.*
-.python-version
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-*.tmp
-*.swp
-*~
-.DS_Store
-Thumbs.db
-
-# Testing
 .pytest_cache/
 .mypy_cache/
-.hypothesis/
+.coverage
+coverage/
+htmlcov/
 
-# Local development
-local/
-instance/
-.webassets-cache
+# Build artifacts
+build/
+dist/
+*.egg-info/
 
 # IDE
 .vscode/
 .idea/
-*.sublime-project
-*.sublime-workspace
-```
+*.swp
+*.swo
 
-Wait, let me reconsider. Looking at the modified files, they are all Python source files and test files. There are no build artifacts, dependency directories, or temporary files in the changes. The original example shows that if only source/config files are present, we should output nothing.
+# OS
+.DS_Store
+Thumbs.db
 
-Since the provided changes only include Python source files (.py) and test files, and no build artifacts or dependency directories, the output should be empty.
+# Logs
+*.log
 
-```gitignore
-
+# Temp files
+*.tmp
 ```

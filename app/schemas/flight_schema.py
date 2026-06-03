@@ -12,6 +12,8 @@ class FlightCreate(BaseModel):
     departureTime: time
     arrivalTime: time
     totalSeats: int = Field(..., gt=0)
+    basePrice: float = Field(default=0.0, description="Базовая цена билета")
+    baggagePrice: float = Field(default=0.0, description="Цена багажа")
 
     @field_validator('flightNumber')
     @classmethod
@@ -42,6 +44,8 @@ class FlightUpdate(BaseModel):
     arrivalTime: Optional[time] = None
     totalSeats: Optional[int] = None
     freeSeats: Optional[int] = None
+    basePrice: Optional[float] = None
+    baggagePrice: Optional[float] = None
 
 class FlightResponse(BaseModel):
     id: int
@@ -54,6 +58,8 @@ class FlightResponse(BaseModel):
     arrivalTime: time = Field(alias="arrival_time")
     totalSeats: int = Field(alias="total_seats")
     freeSeats: int = Field(alias="free_seats")
+    basePrice: float = Field(default=0.0, alias="base_price", description="Базовая цена билета")
+    baggagePrice: float = Field(default=0.0, alias="baggage_price", description="Цена багажа")
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
