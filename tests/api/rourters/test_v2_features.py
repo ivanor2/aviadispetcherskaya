@@ -73,8 +73,8 @@ class TestV2AdvancedFeatures:
             "arrivalAirportIcao": arr_icao,
             "departureDate": "2026-12-12",
             "departureTime": "10:00:00",
-            "totalSeats": 10,
-            "freeSeats": 10
+            "arrivalTime": "14:00:00",
+            "totalSeats": 10
         }, headers=headers)
         assert f_res.status_code == 201, f"Flight: {f_res.text}"
         flight = f_res.json()

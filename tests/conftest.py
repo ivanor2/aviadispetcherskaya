@@ -210,8 +210,11 @@ def fake_airport_data():
             - icaoCode: Валидный 4-буквенный ICAO-код.
             - name: Название аэропорта с суффиксом "Intl".
     """
-    prefix = random.choice(list(VALID_ICAO_PREFIXES))
-    suffix = ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=4 - len(prefix)))
+    # Используем только двухбуквенные префиксы, чтобы итоговый код всегда был 4 символа
+    # и первые 2 символа гарантированно были в VALID_ICAO_PREFIXES
+    two_letter_prefixes = [p for p in VALID_ICAO_PREFIXES if len(p) == 2]
+    prefix = random.choice(two_letter_prefixes)
+    suffix = ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
     return {"icaoCode": prefix + suffix, "name": fake.city() + " Intl"}
 
 
@@ -270,9 +273,11 @@ def fake_flight_data(db_session, fake_airline_data, fake_airport_data):
     airline_controller.create_airline(AirlineCreate(**fake_airline_data), db_session)
     airport_controller.create_airport(AirportCreate(**fake_airport_data), db_session)
 
-    arr_icao = random.choice(list(VALID_ICAO_PREFIXES)) + ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
+    # Используем двухбуквенные префиксы для генерации валидного 4-символьного ICAO-кода
+    two_letter_prefixes = [p for p in VALID_ICAO_PREFIXES if len(p) == 2]
+    arr_icao = random.choice(two_letter_prefixes) + ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
     while arr_icao == fake_airport_data["icaoCode"]:
-        arr_icao = random.choice(list(VALID_ICAO_PREFIXES)) + ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
+        arr_icao = random.choice(two_letter_prefixes) + ''.join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=2))
     airport_controller.create_airport(AirportCreate(icaoCode=arr_icao, name="Arrival"), db_session)
 
     return {

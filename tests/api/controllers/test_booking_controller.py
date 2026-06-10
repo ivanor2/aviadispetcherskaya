@@ -47,11 +47,37 @@ class TestBookingController:
         """Тестирует ошибку при продаже билета на рейс без мест.
         
         Проверяет, что попытка продажи при отсутствии мест вызывает HTTPException.
+        create_flight всегда устанавливает free_seats = total_seats.
+        generate_seat использует total_seats // 6 рядов, поэтому берём 6 мест (1 ряд),
+        заполняем все 6 мест и потом пробуем продать ещё один билет.
         """
-        fake_flight_data["freeSeats"] = 0
+        from tests.conftest import fake as cfake
+        fake_flight_data["totalSeats"] = 6
         f, p = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
+        # Заполняем все 6 мест, создавая уникальных пассажиров
+        passengers = [p]
+        for i in range(5):
+            extra = create_passenger(PassengerCreate(
+                passportNumber=f"{cfake.numerify('7')}{i:03d}-{cfake.numerify('######')}",
+                passportIssuedBy=f"City{i} UVMS",
+                passportIssueDate="2021-01-01",
+                fullName=f"Passenger {i}",
+                birthDate="1988-01-01"
+            ), db_session)
+            passengers.append(extra)
+        for px in passengers:
+            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[px.id]), db_session)
+        
+        # Теперь все места заняты, пробуем продать ещё один
+        extra_p = create_passenger(PassengerCreate(
+            passportNumber=f"9999-999999",
+            passportIssuedBy="Last UVMS",
+            passportIssueDate="2021-06-01",
+            fullName="Last Passenger",
+            birthDate="1985-05-15"
+        ), db_session)
         with pytest.raises(HTTPException) as exc:
-            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p.id]), db_session)
+            sell_ticket(BookingCreate(flightId=f.id, passengerIds=[extra_p.id]), db_session)
         assert "Недостаточно мест" in exc.value.detail
 
     def test_sell_duplicate(self, db_session, fake_flight_data, fake_passenger_data):
@@ -76,13 +102,20 @@ class TestBookingController:
         """Тестирует ошибку при попытке занять уже занятое место."""
         from app.controllers.passenger_controller import create_passenger
         from app.schemas.passenger_schema import PassengerCreate
+        from tests.conftest import fake as cfake
         
         f, p1 = self.setup_infra(db_session, fake_flight_data, fake_passenger_data)
         # Бронируем место 1A для первого пассажира
         sell_ticket(BookingCreate(flightId=f.id, passengerIds=[p1.id], seats=["1A"]), db_session)
         
-        # Создаем второго пассажира
-        p2 = create_passenger(PassengerCreate(**fake_passenger_data), db_session)
+        # Создаём второго пассажира с уникальным паспортом (иначе дубль паспорта)
+        p2 = create_passenger(PassengerCreate(
+            passportNumber=f"{cfake.numerify('8888')}-{cfake.numerify('888888')}",
+            passportIssuedBy="Another UVMS",
+            passportIssueDate="2022-03-10",
+            fullName="Second Passenger",
+            birthDate="1992-07-20"
+        ), db_session)
         
         # Пытаемся забронировать то же место
         with pytest.raises(HTTPException) as exc:
@@ -147,9 +180,9 @@ class TestBookingController:
         # Проверяем, что создалось 2 бронирования (основное + пересадка)
         assert len(bookings) == 2
 
-        # Проверяем, что место списалось на рейсе пересадки
+        # Проверяем, что место списалось на рейсе пересадки (f2 создан с total_seats=150, free_seats=150, после продажи 1 билета должно стать 149)
         db_session.refresh(f2)
-        assert f2.free_seats == 49
+        assert f2.free_seats == 149
 
     def test_sell_ticket_flight_not_found(self, db_session, fake_passenger_data, max_flight_id):
         """Тестирует ошибку при продаже билета на несуществующий рейс.

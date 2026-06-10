@@ -24,7 +24,7 @@ class BookingResponse(BaseModel):
     paymentType: str = Field(default="card", alias="payment_type")
     additionalFees: float = Field(default=0.0, alias="additional_fees")
     classType: str = Field(default="economy", alias="class_type", description="Класс обслуживания")
-    finalPrice: float = Field(description="Финальная цена", alias="final_price")
+
 
     class Config:
         from_attributes = True
