@@ -83,3 +83,9 @@ python -m app.utils.populate_db --airports N --passengers M --flights K --bookin
 ```
 
 где N, M, K, L - это количество элементов соответствующего типа, которое вы хотите сгенерировать (целые числа).
+
+### Сборка проекта в exe
+
+```bash
+pyinstaller --clean --noconfirm django_packaging.spec
+```
